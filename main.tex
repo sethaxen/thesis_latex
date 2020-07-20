@@ -1,0 +1,181 @@
+\documentclass[12pt,twoside]{report}
+\usepackage[utf8]{inputenc}
+
+\title{Representing Ensembles of Molecules}
+\author{Seth Denton Axen}
+\date{August 2020}
+
+\usepackage{graphicx}
+\graphicspath{ {figures/} }
+
+% UCSF style
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace} % Allows double spacing with the \doublespacing command
+\usepackage{fancyhdr}
+% \setlength{\headheight}{14.5pt}
+\fancyfoot[C]{\thepage}
+% not sure if this is necessary, but UCSF guidelines stress no widows or orphans
+\usepackage[defaultlines=1,all]{nowidow}
+
+% E3FP paper preamble
+\usepackage{siunitx}
+\usepackage{amssymb}
+\usepackage{textgreek}
+\newcommand{\AUCsum}{AUC\textsubscript{SUM}}
+\newcommand{\LEunit}{kcal/mol/heavy atom}
+\newcommand{\axbx}[2]{\textalpha #1\textbeta #2}
+\newcommand{\ax}[1]{\textalpha #1}
+\newcommand{\Mx}[1]{M\textsubscript{#1}}
+\newcommand{\ICfifty}{$IC_\text{50}$}
+\newcommand{\Ki}{$K_i$}
+\DeclareSIUnit{\molar}{M}
+\sisetup{per-mode=symbol, detect-weight=true, detect-family=true}
+
+% bibliography data
+\usepackage{biblatex}
+\addbibresource{references.bib}
+
+% table formatting
+\usepackage{booktabs}
+
+% math
+\usepackage{amsmath}
+\raggedbottom
+
+%% symbols
+\newcommand{\torus}{\mathbb{T}}
+\newcommand{\mset}[1]{\mathcal{#1}}
+\newcommand{\manifold}[1]{\mset{#1}}
+\newcommand{\group}[1]{\mset{#1}}
+\newcommand{\liealg}[1]{\mathfrak{#1}}
+%%% basic types
+\renewcommand{\vec}[1]{\MakeLowercase{#1}}
+\newcommand{\mat}[1]{\MakeUppercase{#1}}
+%%% operations
+\newcommand{\conj}[1]{{#1}^*}
+\newcommand{\trans}[1]{{#1}^\mathrm{T}}
+\newcommand{\invtrans}[1]{{#1}^{-\mathrm{T}}}
+\newcommand{\hconj}[1]{{#1}^\mathrm{H}}
+\newcommand{\invhconj}[1]{{#1}^{-\mathrm{H}}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\sign}{\operatorname{sign}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\expm}{\operatorname{Exp}}
+\newcommand{\logm}{\operatorname{Log}}
+\newcommand{\convwith}{*}
+\newcommand{\coef}{\tilde}
+\newcommand{\inner}[2]{\left\langle #1, #2 \right\rangle}
+%%% differential types
+\newcommand{\Dtan}[1]{\dot{#1}} % tangent
+\newcommand{\Dcot}[1]{\overline{#1}} % cotangent
+%%% shorthand for specific objects
+\newcommand{\bbR}{\mathbb{R}}
+\newcommand{\bbC}{\mathbb{C}}
+\newcommand{\SE}[1]{\group{SE}(#1)}
+\newcommand{\se}[1]{\liealg{se}(#1)}
+\newcommand{\SO}[1]{\group{SO}(#1)}
+\newcommand{\so}[1]{\liealg{so}(#1)}
+\newcommand{\Transg}[1]{\group{T}(#1)}
+\newcommand{\transg}[1]{\liealg{t}(#1)}
+\newcommand{\SU}[1]{\group{SU}(#1)}
+\newcommand{\su}[1]{\liealg{su}(#1)}
+\newcommand{\GL}[1]{\group{GL}(#1)}
+\newcommand{\gl}[1]{\liealg{gl}(#1)}
+\newcommand{\GA}[1]{\group{GA}(#1)}
+\newcommand{\ga}[1]{\liealg{ga}(#1)}
+\newcommand{\im}{i}
+
+% code formatting
+\usepackage{sourcecodepro} % support more UTF-8 characters
+\usepackage{minted} % syntax highlighting
+\newminted{julia}{frame=lines,framesep=2mm}
+
+% reference formatting
+\usepackage{hyperref}
+\usepackage{nameref}
+\usepackage{chngcntr}
+\counterwithin{figure}{chapter}
+\counterwithin{table}{chapter}
+\counterwithin{equation}{chapter}
+\usepackage[capitalize, nameinlink]{cleveref}
+\crefdefaultlabelformat{#2\textbf{#1}#3} % <-- Only #1 in \textbf
+\crefname{figure}{\textbf{Fig.}}{\textbf{Figs.}}
+\Crefname{figure}{\textbf{Fig.}}{\textbf{Figs.}}
+\crefname{table}{\textbf{Table}}{\textbf{Tables}}
+\Crefname{table}{\textbf{Table}}{\textbf{Tables}}
+\crefname{equation}{\textbf{Eq.}}{\textbf{Eqs.}}
+\Crefname{equation}{\textbf{Eq.}}{\textbf{Eqs.}}
+
+\usepackage[colorinlistoftodos]{todonotes} % for todo entries
+
+\usepackage{subfiles} % compile files separately
+
+\begin{document}
+
+\pagestyle{plain} % no headers
+
+% UCSF as of Summer 2020 does not include the title page
+% \maketitle
+\pagenumbering{roman}
+\setcounter{page}{2}
+
+\input{frontmatter/copyright}
+
+\doublespacing
+
+\chapter*{Acknowledgements}
+\input{frontmatter/acknowledgments}
+
+\chapter*{Contributions}
+\input{frontmatter/contributions}
+
+\chapter*{Epigraph}
+\input{frontmatter/epigraph}
+
+\chapter*{Abstract}
+\input{frontmatter/abstract}
+
+\tableofcontents
+
+\listoffigures
+
+\listoftables
+
+\clearpage
+\pagestyle{fancy} % header
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\chapter{Introduction}
+\subfile{chapters/introduction}
+
+\chapter{A simple representation of three-dimensional molecular structure}
+\label{e3fp-paper}
+\chaptermark{Three-dimensional molecular representation}
+\subfile{chapters/chapter02}
+
+\chapter{Inferring ensembles of macromolecular structures}
+\label{ensemble-inference}
+\chaptermark{Inferring macromolecular ensembles}
+\subfile{chapters/chapter03}
+
+\chapter{SHG/TPF}
+\label{shg-tpf}
+\subfile{chapters/chapter04}
+
+\appendix
+
+\chapter{Supplementary information for Chapter \ref{ensemble-inference}}
+\subfile{chapters/appendixa}
+
+\chapter{Supplementary information for Chapter \ref{shg-tpf}}
+\subfile{chapters/appendixb}
+
+\chapter{Deriving automatic differentiation rules}
+\subfile{chapters/appendixc}
+
+\chapter{Automatic differentation rules for power series functions of diagonalizable matrices}
+\chaptermark {Differentating power series functions}
+\subfile{chapters/appendixd}
+
+\end{document}

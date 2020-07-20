@@ -1,0 +1,692 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\begin{refsection}
+
+\section{Preface}\label{preface}
+
+The content of this section was originally written for the documentation of ChainRules.jl (\url{https://github.com/JuliaDiff/ChainRules.jl}) and ChainRulesCore.jl (\url{https://github.com/JuliaDiff/ChainRulesCore.jl}), which provide an interface for defining custom automatic differentiation rules for the Julia language (Bezanson et al. \protect\hyperlink{ref-Julia-2017}{2017}).
+This section assumes a basic understanding of automatic differentiation as is provided in the included references.
+It also includes examples written in the Julia language and assumes a basic understanding of the ChainRules.jl and ChainRulesCore.jl packages.
+Because it is a tutorial, it is written in a more informal style.
+
+\section{Introduction}\label{introduction}
+
+One of the goals of the ChainRules interface is to make it easy to define your own rules for a function.
+This tutorial attempts to demystify deriving and implementing custom rules for arrays with real and complex entries, with examples.
+The approach we use is similar to the one succinctly explained and demonstrated in \cite{giles_collected_2008} and its extended work \cite{giles_extended_2008}, but we generalize it to support functions of multidimensional arrays with both real and complex entries.
+
+Throughout this tutorial, we will use the following type alias:
+\begin{juliacode}
+const RealOrComplex = Union{Real,Complex}
+\end{juliacode}
+\section{Forward-mode rules}\label{forward-mode-rules}
+
+\subsection{Approach}\label{approach}
+
+Consider a function
+\begin{juliacode}
+Ω = f(X::Array{<:RealOrComplex}...)::Array{<:RealOrComplex}
+\end{juliacode}
+or in math notation
+\[f \colon (\ldots, X_m, \ldots) \mapsto \Omega,\]
+where the components of $X_m$ are written as $(X_m)_{i,\ldots,j}$.
+
+The variables $X_m$ and $\Omega$ are intermediates in a larger program (function) that, by considering only a single real input $t$ and real output $s$ can always be written as
+\[t \mapsto (\ldots, X_m, \ldots) \mapsto \Omega \mapsto s,\]
+where $t$ and $s$ are real numbers.
+If we know the partial derivatives of $X_m$ with respect to $t$, $\frac{dX_m}{dt} = \Dtan{X}_m$, the chain rule gives the pushforward of $f$ as:
+\begin{equation} \label{pf}
+\Dtan{\Omega}
+    = f_*(\ldots, \Dtan{X}_m, \ldots)
+    = \sum_m \sum_{i, \ldots, j}
+        \frac{\partial \Omega}{ \partial (X_m)_{i,\ldots,j} } (\Dtan{X}_m)_{i,\ldots,j}
+\end{equation}
+That's ugly, but in practice we can often write it more simply by using forward mode rules for simpler functions, as we'll see below.
+The forward-mode rules for arrays follow directly from the usual scalar chain rules.
+
+\subsection{Array addition}\label{array-addition}
+\begin{juliacode}
+Ω = A + B
+\end{juliacode}
+This one is easy:
+\begin{align*}
+\Omega &= A + B\\
+\Dtan{\Omega} &= \Dtan{A} + \Dtan{B}
+\end{align*}
+We can implement the \mintinline{julia}{frule} in ChainRules's notation:
+\begin{juliacode}
+function frule(
+    (_, ΔA, ΔB),
+    ::typeof(+),
+    A::Array{<:RealOrComplex},
+    B::Array{<:RealOrComplex},
+)
+    Ω = A + B
+    ∂Ω = ΔA + ΔB
+    return (Ω, ∂Ω)
+end
+\end{juliacode}
+\subsection{Matrix multiplication}\label{matrix-multiplication}
+\begin{juliacode}
+Ω = A * B
+\end{juliacode}
+\[\Omega = A B\]
+First we write in component form:
+\[\Omega_{ij} = \sum_k A_{ik} B_{kj}\]
+Then we use the product rule to get the pushforward for each scalar entry:
+\begin{align*}
+\Dtan{\Omega}_{ij}
+    &= \sum_k \left( \Dtan{A}_{ik} B_{kj} + A_{ik} \Dtan{B}_{kj} \right)
+        && \text{apply scalar product rule }
+            \frac{d}{dt}(x y) = \frac{dx}{dt} y + x \frac{dy}{dt} \\
+    &= \sum_k \Dtan{A}_{ik} B_{kj} + \sum_k A_{ik} \Dtan{B}_{kj}
+        && \text{split sum}
+\end{align*}
+But the last expression is just the component form of a sum of matrix products:
+\begin{equation}\label{diffprod}
+\Dtan{\Omega} = \Dtan{A} B + A \Dtan{B}
+\end{equation}
+This is the matrix product rule, and we write its \mintinline{julia}{frule} as
+\begin{juliacode}
+function frule(
+    (_, ΔA, ΔB),
+    ::typeof(*),
+    A::Matrix{<:RealOrComplex},
+    B::Matrix{<:RealOrComplex},
+)
+    Ω = A * B
+    ∂Ω = ΔA * B + A * ΔB
+    return (Ω, ∂Ω)
+end
+\end{juliacode}
+\subsection{Matrix inversion}\label{matrix-inversion}
+\begin{juliacode}
+Ω = inv(A)
+\end{juliacode}
+\[\Omega = A^{-1}\]
+It's easiest to derive this rule from either of the two constraints:
+\begin{align*}
+\Omega A &= A^{-1} ~A = I\\
+A \Omega &= A~ A^{-1} = I,
+\end{align*}
+where $I$ is the identity matrix.
+
+We use the matrix product rule to differentiate the first constraint:
+\[\Dtan{\Omega} A + \Omega \Dtan{A} = 0\]
+Then, right-multiply both sides by $A^{-1}$ to isolate $\Dtan{\Omega}$:
+\begin{align}
+0  &= \Dtan{\Omega}~ A~ A^{-1} + \Omega ~\Dtan{A}~ A^{-1} \nonumber\\
+   &= \Dtan{\Omega}~ I + \Omega ~\Dtan{A}~ A^{-1}
+       && \text{use } A~ A^{-1} = I \nonumber\\
+   &= \Dtan{\Omega} + \Omega \Dtan{A} \Omega
+       && \text{substitute } A^{-1} = \Omega \nonumber\\
+\Dtan{\Omega}
+   &= -\Omega \Dtan{A} \Omega
+       && \text{solve for } \Dtan{\Omega} \label{invdiff}
+\end{align}
+We write the \mintinline{julia}{frule} as
+\begin{juliacode}
+function frule(
+    (_, ΔA),
+    ::typeof(inv),
+    A::Matrix{<:RealOrComplex},
+)
+    Ω = inv(A)
+    ∂Ω = -Ω * ΔA * Ω
+    return (Ω, ∂Ω)
+end
+\end{juliacode}
+\subsection{Other useful identities}\label{other-useful-identities}
+
+These identities are particularly useful:
+\begin{align*}
+\frac{d}{dt} \left( \Re(A) \right) &= \Re(\Dtan{A})\\
+\frac{d}{dt} \left( \conj{A} \right) &= \conj{\Dtan{A}}\\
+\frac{d}{dt} \left( \trans{A} \right) &= \trans{\Dtan{A}}\\
+\frac{d}{dt} \left( \hconj{A} \right) &= \hconj{\Dtan{A}}\\
+\frac{d}{dt} \left( \sum_{j}  A_{i \ldots j \ldots k} \right) &=
+    \sum_{j} \Dtan{A}_{i \ldots j \ldots k},
+\end{align*}
+where $\hconj{\cdot} = \conj{\trans{\cdot}}$ is the conjugate transpose (the \mintinline{julia}{adjoint} function).
+
+\section{Reverse-mode rules}\label{reverse-mode-rules}
+
+\subsection{Approach}\label{approach-1}
+
+Reverse-mode rules are a little less intuitive, but we can re-use our pushforwards to simplify their derivation.
+Recall our program:
+\[t \mapsto (\ldots, X_m, \ldots) \mapsto \Omega \mapsto s,\]
+At any step in the program, if we have intermediates $X_m$, we can write down the derivative $\frac{ds}{dt}$ in terms of the tangents $\Dtan{X}_m = \frac{dX_m}{dt}$ and adjoints $\Dcot{X}_m = \frac{\partial s}{\partial X_m}$:
+\begin{align*}
+\frac{ds}{dt}
+    &= \sum_m \Re\left( \sum_{i,\ldots,j}
+           \conj{\left(  \frac{\partial s}{\partial (X_m)_{i,\ldots,j}}  \right)}
+           \frac{d (X_m)_{i,\ldots,j}}{dt}
+       \right)\\
+    &= \sum_m \Re\left( \sum_{i,\ldots,j}
+           \conj{\left(  (\Dcot{X}_m)_{i,\ldots,j}  \right)}
+           (\Dtan{X}_m)_{i,\ldots,j}
+       \right)\\
+    &= \sum_m \Re\left(
+           \inner{ \Dcot{X}_m }
+                 { \Dtan{X}_m }
+       \right),
+\end{align*}
+where $\conj{\cdot}$ is the complex conjugate (\mintinline{julia}{conj}), $\Re(\cdot)$ is the real part of its argument (\mintinline{julia}{real}), and $\langle \cdot, \cdot \rangle$ is the inner product (\mintinline{julia}{LinearAlgebra.dot}).\footnotemark
+
+\footnotetext{
+  Why do we conjugate, and why do we only use the real part of the dot product in \eqref{pbident}?
+  Recall from the ChainRules.jl documentation that we treat a complex number as a pair of real numbers.
+  These identities are a direct consequence of this convention.
+  Consider $\frac{ds}{dt}$ for a scalar function $f \colon (x + i y) \mapsto (u + i v)$:
+  \begin{align*}
+  \frac{ds}{dt}
+      &= \Re\left( \inner
+              { \Dcot{x} + i \Dcot{y} }{ \Dtan{x} + i \Dtan{y} }
+          \right) \\
+      &= \Re\left(
+              \conj{\left(  \Dcot{x} + i \Dcot{y}  \right)}
+              \left( \Dtan{x} + i \Dtan{y} \right)
+          \right) \\
+      &= \Re\left(
+              \left( \Dcot{x} - i \Dcot{y} \right)
+              \left( \Dtan{x} + i \Dtan{y} \right)
+          \right) \\
+      &= \Re\left(
+              \left( \Dcot{x} \Dtan{x} + \Dcot{y} \Dtan{y} \right) +
+              i \left( \Dcot{x} \Dtan{y} - \Dcot{y} \Dtan{x} \right)
+          \right)\\
+      &= \Dcot{x} \Dtan{x} + \Dcot{y} \Dtan{y}\\
+  \end{align*}
+  which is exactly what the identity would produce if we had written the function as $f \colon (x, y) \mapsto (u, v)$.
+}
+
+Because this equation follows at any step of the program, we can equivalently write
+\[\frac{ds}{dt} = \Re\left( \inner{ \Dcot{\Omega} }{ \Dtan{\Omega} } \right),\]
+which gives the identity
+\begin{equation} \label{pbident}
+\Re\left( \inner{ \Dcot{\Omega} }{ \Dtan{\Omega} } \right) = 
+\sum_m \Re\left( \inner{ \Dcot{X}_m}{ \Dtan{X}_m } \right).
+\end{equation}
+For matrices and vectors, $\inner{A}{B} = \tr(\hconj{A} B)$, and the identity simplifies to:
+\begin{equation} \label{pbidentmat}
+\Re\left( \tr\left(
+    \hconj{\Dcot{\Omega}} \Dtan{\Omega}
+\right) \right) =
+\sum_m \Re \left( \tr \left(
+    \hconj{\Dcot{X}_m} \Dtan{X}_m
+\right) \right),
+\end{equation}
+where $\tr(\cdot)$ is the matrix trace (\mintinline{julia}{LinearAlgebra.tr}) function.
+
+Our approach for deriving the adjoints $\Dcot{X}_m$ is then:
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Derive the pushforward ($\Dtan{\Omega}$ in terms of $\Dtan{X}_m$) using \eqref{pf}.
+\item
+  Substitute this expression for $\Dtan{\Omega}$ into the left-hand side of \eqref{pbident}.
+\item
+  Manipulate until it looks like the right-hand side of \eqref{pbident}.
+\item
+  Solve for each $\Dcot{X}_m$.
+\end{enumerate}
+Note that the final expressions for the adjoints will not contain any $\Dtan{X}_m$ terms.
+
+For matrices and vectors, several properties of the trace function come in handy:
+\begin{align}
+\tr(A+B) &= \tr(A) + \tr(B) \label{trexpand}\\
+\tr(\trans{A}) &= \tr(A) \nonumber\\
+\tr(\hconj{A}) &= \conj{\tr(A}) \nonumber\\
+\tr(AB) &= \tr(BA) \label{trperm}
+\end{align}
+Now let's derive a few pullbacks using this approach.
+
+\subsection{Matrix multiplication}\label{matrix-multiplication-1}
+\begin{juliacode}
+Ω = A * B
+\end{juliacode}
+We above derived in \eqref{diffprod} the pushforward
+\[\Dtan{\Omega} = \Dtan{A} B + A \Dtan{B}\]
+Using \eqref{pbidentmat}, we now multiply by $\hconj{\Dcot{\Omega}}$ and take the real trace:
+\begin{align*}
+\Re\left( \tr \left(
+        \hconj{\Dcot{\Omega}} \Dtan{\Omega}
+\right) \right)
+    &= \Re\left( \tr \left( \hconj{\Dcot{\Omega}} ~\left(
+           \Dtan{A} B + A \Dtan{B}
+       \right) \right) \right)
+           && \text{substitute } \Dtan{\Omega} \text{ from } \eqref{diffprod}\\
+    &= \Re\left( \tr \left(
+           \hconj{\Dcot{\Omega}} \Dtan{A} B
+       \right) \right) +
+       \Re\left( \tr \left(
+           \hconj{\Dcot{\Omega}}  A \Dtan{B}
+       \right) \right)
+           && \text{expand using } \eqref{trexpand} \\
+    &= \Re\left( \tr \left(
+           B \hconj{\Dcot{\Omega}} \Dtan{A}
+       \right) \right) +
+       \Re\left( \tr \left(
+           \hconj{\Dcot{\Omega}} A \Dtan{B}
+       \right) \right)
+           && \text{rearrange the left term using } \eqref{trperm}\\
+    &= \Re\left( \tr \left(
+           \hconj{\Dcot{A}}  \Dtan{A}
+       \right) \right) +
+       \Re\left( \tr \left(
+           \hconj{\Dcot{B}} \Dtan{B}
+       \right) \right)
+           && \text{right-hand side of } \eqref{pbidentmat}
+\end{align*}
+That's it!
+The expression is in the desired form to solve for the adjoints by comparing the last two lines:
+\begin{align*}
+B \hconj{\Dcot{\Omega}} \Dtan{A} &= \hconj{\Dcot{A}}  \Dtan{A}, \quad
+    && \Dcot{A} = \Dcot{\Omega} \hconj{B}\\
+\hconj{\Dcot{\Omega}} A \Dtan{B} &= \hconj{\Dcot{B}} \Dtan{B}, \quad
+    && \Dcot{B} = \hconj{A} \Dcot{\Omega}
+\end{align*}
+Using ChainRules's notation, we would implement the \mintinline{julia}{rrule} as
+\begin{juliacode}
+function rrule(
+    ::typeof(*),
+    A::Matrix{<:RealOrComplex},
+    B::Matrix{<:RealOrComplex},
+)
+    function times_pullback(ΔΩ)
+        ∂A = @thunk(ΔΩ * B')
+        ∂B = @thunk(A' * ΔΩ)
+        return (NO_FIELDS, ∂A, ∂B)
+    end
+    return A * B, times_pullback
+end
+\end{juliacode}
+\subsection{Matrix inversion}\label{matrix-inversion-1}
+\begin{juliacode}
+Ω = inv(A)
+\end{juliacode}
+In \eqref{invdiff}, we derived the pushforward as
+
+\[\Dtan{\Omega} = -\Omega \Dtan{A} \Omega\]
+
+Using \eqref{pbidentmat},
+\begin{align*}
+\Re\left( \tr \left(
+    \hconj{\Dcot{\Omega}} \Dtan{\Omega}
+\right) \right)
+    &= \Re\left( \tr \left(
+           -\hconj{\Dcot{\Omega}} \Omega \Dtan{A} \Omega
+       \right) \right)
+           && \text{substitute } \eqref{invdiff}\\
+    &= \Re\left( \tr \left(
+           -\Omega \hconj{\Dcot{\Omega}} \Omega \Dtan{A}
+       \right) \right)
+           && \text{rearrange using } \eqref{trperm}\\
+    &= \Re\left( \tr \left(
+           \hconj{\Dcot{A}} \Dtan{A}
+       \right) \right)
+           && \text{right-hand side of } \eqref{pbidentmat}
+\end{align*}
+we can now solve for $\Dcot{A}$:
+
+\[\Dcot{A} = \hconj{\left( -\Omega \hconj{\Dcot{\Omega}} \Omega \right)}
+             = -\hconj{\Omega} \Dcot{\Omega} \hconj{\Omega}\]
+
+We can implement the resulting \mintinline{julia}{rrule} as
+\begin{juliacode}
+function rrule(::typeof(inv), A::Matrix{<:RealOrComplex})
+    Ω = inv(A)
+    function inv_pullback(ΔΩ)
+        ∂A = -Ω' * ΔΩ * Ω'
+        return (NO_FIELDS, ∂A)
+    end
+    return Ω, inv_pullback
+end
+\end{juliacode}
+\section{A multidimensional array example}\label{a-multidimensional-array-example}
+
+We presented the approach for deriving pushforwards and pullbacks for arrays of arbitrary dimensions, so let's cover an example.
+For multidimensional arrays, it's often easier to work in component form.
+Consider the following function:
+\begin{juliacode}
+Ω = sum(
+    abs2,
+    X::Array{<:RealOrComplex,3};
+    dims=2,
+)::Array{<:Real,3}
+\end{juliacode}
+which we write as
+
+\[\Omega_{i1k} = \sum_{j} |X_{ijk}|^2
+             = \sum_{j} \Re \left(
+                  \conj{ X_{ijk} } X_{ijk}
+               \right)\]
+
+The pushforward from \eqref{pf} is
+\begin{align}
+\Dtan{\Omega}_{i1k}
+    &= \sum_j \Re\left(
+           \conj{ \Dtan{X}_{ijk} } X_{ijk} +
+           \conj{ X_{ijk} } \Dtan{X}_{ijk} \right) \nonumber\\
+    &= \sum_j \Re\left(
+            \conj{\left(
+                \conj{ X_{ijk} } \Dtan{X}_{ijk}
+            \right)} +
+            \conj{X_{ijk}} \Dtan{X}_{ijk}
+       \right) \nonumber\\
+    &= \sum_j 2 \Re\left(
+           \conj{ X_{ijk} } \Dtan{X}_{ijk}
+       \right), \label{sumabspf}
+\end{align}
+where in the last step we have used the fact that for all real $a$ and $b$,
+
+\[(a + i b) + \conj{a + i b}
+    = (a + i b) + (a - i b)
+    = 2 a
+    = 2 \Re (a + i b).\]
+
+Because none of this derivation depended on the index (or indices), we implement \mintinline{julia}{frule} generically as
+\begin{juliacode}
+function frule(
+    (_, _, ΔX),
+    ::typeof(sum),
+    ::typeof(abs2),
+    X::Array{<:RealOrComplex};
+    dims = :,
+)
+    Ω = sum(abs2, X; dims = dims)
+    ∂Ω = sum(2 .* real.(conj.(X) .* ΔX); dims = dims)
+    return (Ω, ∂Ω)
+end
+\end{juliacode}
+We can now derive the reverse-mode rule.
+The array form of \eqref{pbident} is
+
+\begingroup
+\allowdisplaybreaks
+\begin{align*}
+\Re\left( \inner{ \Dcot{\Omega} }{ \Dtan{\Omega} } \right)
+    &= \Re \left( \sum_{ik}
+           \conj{ \Dcot{\Omega}_{i1k} } \Dtan{\Omega}_{i1k}
+       \right)
+           && \text{expand left-hand side of } \eqref{pbident}\\
+    &= \Re \left(\sum_{ijk}
+           \conj{ \Dcot{\Omega}_{i1k} }
+           2 \Re\left(
+               \conj{ X_{ijk} } \Dtan{X}_{ijk}
+           \right)
+       \right)
+           && \text{substitute } \eqref{sumabspf}\\
+    &= \Re \left( \sum_{ijk}
+           \left(
+               2 \Re \left( \Dcot{\Omega}_{i1k} \right)
+               \conj{ X_{ijk} }
+           \right) \Dtan{X}_{ijk}
+       \right)
+           && \text{bring } \Dtan{X}_{ijk} \text{ outside of } \Re\\
+    &= \Re \left( \sum_{ijk}
+           \conj{ \Dcot{X}_{ijk} } \Dtan{X}_{i1k}
+       \right)
+           && \text{expand right-hand side of } \eqref{pbident}
+\end{align*}
+\endgroup
+
+We now solve for $\Dcot{X}$:
+\begin{align*}
+\Dcot{X}_{ijk}
+    &= \conj{\left(
+            2 \Re \left( \Dcot{\Omega}_{i1k} \right)
+            \conj{ X_{ijk} }
+        \right)}\\
+    &= 2\Re \left( \Dcot{\Omega}_{i1k} \right) X_{ijk}
+\end{align*}
+Like the \mintinline{julia}{frule}, this \mintinline{julia}{rrule} can be implemented generically:
+\begin{juliacode}
+function rrule(
+    ::typeof(sum),
+    ::typeof(abs2),
+    X::Array{<:RealOrComplex};
+    dims = :,
+)
+    function sum_abs2_pullback(ΔΩ)
+        ∂abs2 = DoesNotExist()
+        ∂X = @thunk(2 .* real.(ΔΩ) .* X)
+        return (NO_FIELDS, ∂abs2, ∂X)
+    end
+    return sum(abs2, X; dims = dims), sum_abs2_pullback
+end
+\end{juliacode}
+\section{Functions that return a tuple}\label{functions-that-return-a-tuple}
+
+Every Julia function returns a single output.
+For example, let's look at \mintinline{julia}{LinearAlgebra.logabsdet}, the logarithm of the absolute value of the determinant of a matrix, which returns $\log |\det(A)|$ and $\sign(\det A) = \frac{\det A}{| \det A |}$:
+\begin{juliacode}
+(l, s) = logabsdet(A)
+\end{juliacode}
+The return type is actually a single output, a tuple of scalars, but when deriving, we treat them as multiple outputs.
+The left-hand side of \eqref{pbident} then becomes a sum over terms, just like the right-hand side.
+
+Let's derive the forward- and reverse-mode rules for \mintinline{julia}{logabsdet}.
+\begin{align*}
+l &= \log |\det(A)|\\
+s &= \sign(\det(A)),
+\end{align*}
+where $\sign(x) = \frac{x}{|x|}$.
+
+\subsection{Forward-mode rule}\label{forward-mode-rule}
+
+To make this easier, let's break the computation into more manageable steps:
+\begin{align*}
+d &= \det(A)\\
+a &= |d| = \sqrt{\Re \left( \conj{d} d \right)}\\
+l &= \log a\\
+s &= \frac{d}{a}
+\end{align*}
+We'll make frequent use of the identities:
+\[d = a s\]
+\[\conj{s} s = \frac{\conj{d} d}{a^2} = \frac{a^2}{a^2} = 1\]
+It will also be useful to define $b = \tr\left( A^{-1} \Dtan{A} \right)$.
+
+For $\Dtan{d}$, we use the pushforward for the determinant given in section 2.2.4 of \cite{giles_extended_2008}:
+\[\Dtan{d} = d b\]
+Now we'll compute the pushforwards for the remaining steps.
+\begingroup
+\allowdisplaybreaks
+\begin{align*}
+\Dtan{a} &= \frac{1}{2 a} \frac{d}{dt}
+                         \Re\left( \conj{d} d \right)\\
+        &= \frac{2}{2 a} \Re \left( \conj{d} \Dtan{d} \right)\\
+        &= \Re \left( \conj{s} \Dtan{d} \right)
+            && \text{use } d = a s \\
+        &= \Re \left( \conj{s} d b \right)
+            && \text{substitute } \Dtan{d} \\
+\Dtan{l} &= a^{-1} \Dtan{a}\\
+        &= a^{-1} \Re \left( \conj{s} d b \right)
+            && \text{substitute } \Dtan{a}\\
+        &= \Re \left( \conj{s} s b \right)
+            && \text{use } d = a s \\
+        &= \Re \left(b \right)
+            && \text{use } \conj{s} s = 1\\
+\Dtan{s} &= a^{-1} \Dtan{d} - a^{-2} d \Dtan{a}\\
+        &= a^{-1} \left( \Dtan{d} - \Dtan{a} s \right)
+            && \text{use } d = a s \\
+        &= a^{-1} \left(
+               \Dtan{d} - \Re \left( \conj{s} \Dtan{d} \right) s
+           \right)
+            && \text{substitute } \Dtan{a}\\
+        &= a^{-1} \left(
+               \Dtan{d} - \left(
+                   \conj{s} \Dtan{d} -
+                   i \Im \left( \conj{s} \Dtan{d} \right)
+               \right) s
+           \right)
+            && \text{use } \Re(x) = x - i \Im(x)\\
+        &= a^{-1} \left(
+               \Dtan{d} - \left( \conj{s} s \right) \Dtan{d} +
+               i \Im \left( \conj{s} \Dtan{d} \right) s 
+               \right)\\
+        &= i a^{-1} \Im \left( \conj{s} \Dtan{d} \right) s
+            && \text{use } \conj{s} s = 1\\
+        &= i a^{-1} \Im \left( \conj{s} d b \right) s
+            && \text{substitute } \Dtan{d}\\
+        &= i \Im \left( \conj{s} s b \right) s
+            && \text{use } d = a s \\
+        &= i \Im(b) s
+            && \text{use } \conj{s} s = 1
+\end{align*}
+\endgroup
+
+Note that the term $b$ is reused.
+In summary, after all of that work, the final pushforward is quite simple:
+\begin{align}
+b &= \tr \left( A^{-1} \Dtan{A} \right) \label{logabsdet_b} \\
+\Dtan{l} &= \Re(b) \label{logabsdet_ldot}\\
+\Dtan{s} &= i \Im(b) s \label{logabsdet_sdot}\\
+\end{align}
+We can define the \mintinline{julia}{frule} as:
+\begin{juliacode}
+function frule(
+    (_, ΔA),
+    ::typeof(logabsdet),
+    A::Matrix{<:RealOrComplex},
+)
+    # The primal function uses the lu decomposition to
+    # compute logabsdet.
+    # we reuse this decomposition to compute inv(A) * ΔA.
+    F = lu(A, check = false)
+    Ω = logabsdet(F)
+    b = tr(F \ ΔA) # tr(inv(A) * ΔA)
+    s = last(Ω)
+    ∂l = real(b)
+    # for real A, ∂s will always be zero (because imag(b) = 0)
+    # this is type-stable because the eltype is known
+    ∂s = eltype(A) <: Real ? Zero() : im * imag(b) * s
+    # tangents of tuples are of type Composite{<:Tuple}
+    ∂Ω = Composite{typeof(Ω)}(∂l, ∂s)
+    return (Ω, ∂Ω)
+end
+\end{juliacode}
+\subsection{Reverse-mode rule}\label{reverse-mode-rule}
+
+\begingroup
+\allowdisplaybreaks
+\begin{align*}
+&\Re\left( \tr\left(
+    \hconj{\Dcot{l}} \Dtan{l}
+\right) \right) +
+\Re\left( \tr\left(
+    \hconj{\Dcot{s}} \Dtan{s}
+\right) \right)
+    && \text{left-hand side of } \eqref{pbidentmat}\\
+&= \Re\left( 
+       \conj{ \Dcot{l} } \Dtan{l} +
+       \conj{ \Dcot{s} } \Dtan{s}
+   \right) \\
+&= \Re\left( 
+       \conj{ \Dcot{l} } \Re(b) +
+       i \conj{ \Dcot{s} } s \Im(b)
+   \right)
+       && \text{substitute } \eqref{logabsdet_ldot} \text{ and } \eqref{logabsdet_sdot} \\
+&= \Re\left( 
+       \Re\left( \Dcot{l} \right) \Re(b) -
+       \Im \left(
+           \conj{ \Dcot{s} } s
+       \right) \Im(b)
+   \right)
+       && \text{discard imaginary parts} \\
+&= \Re\left(
+       \left(
+           \Re \left( \Dcot{l} \right) +
+           i \Im \left(
+               \conj{ \Dcot{s} } s
+           \right)
+       \right) b
+   \right)
+       && \text{gather parts of } b \\
+&= \Re\left(
+       \left(
+           \Re \left( \Dcot{l} \right) +
+           i \Im \left(
+               \conj{ \Dcot{s} } s
+           \right)
+       \right)
+       \tr(A^{-1} \Dtan{A})
+   \right)
+       && \text{substitute } b \text{ from } \eqref{logabsdet_b} \\
+&= \Re\left( \tr \left(
+       \left(
+           \Re \left( \Dcot{l} \right) +
+           i \Im \left(
+               \conj{ \Dcot{s} } s
+           \right)
+       \right)
+       A^{-1} \Dtan{A}
+   \right) \right)
+       && \text{bring scalar within } \tr \\
+&= \Re\left( \tr \left( \hconj{\Dcot{A}} \Dtan{A} \right) \right)
+       && \text{right-hand side of } \eqref{pbidentmat}\\
+\end{align*}
+\endgroup
+
+Now we solve for $\Dcot{A}$:
+\begin{align*}
+\Dcot{A} &= \hconj{\left( \left(
+    \Re \left( \Dcot{l} \right) +
+    i \Im \left( \conj{ \Dcot{s} } s \right)
+\right) A^{-1} \right)}\\
+&= \left(
+    \Re \left( \Dcot{l} \right) +
+    i \Im \left( \conj{ s } \Dcot{s} \right)
+\right) \invhconj{A}
+\end{align*}
+It's a good idea when deriving pushforwards and pullbacks to verify that they make sense.\footnotemark
+
+\footnotetext{
+  For the pushforward, since $l$ is real, it follows that $\Dtan{l}$ is too.
+
+  What about $\Dtan{s}$?
+  Well, $s = \frac{d}{|d|}$ is point on the unit circle in the complex plane.
+  Multiplying a complex number by $i$ rotates it counter-clockwise by 90°.
+  So the expression for $\Dtan{s}$ takes a real number, $\Im(b)$, multiplies by $s$ to make it parallel to $s$, then multiplies by $i$ to make it perpendicular to $s$, that is, perfectly tangent to the unit complex circle at $s$.
+
+  For the pullback, it again follows that only the real part of $\Dcot{l}$ is pulled back.
+
+  $\conj{s}$ rotates a number parallel to $s$ to the real line.
+  So $\conj{s} \Dcot{s}$ rotates $\Dcot{s}$ so that its imaginary part is the part that was tangent to the complex circle at $s$, while the real part is the part that was not tangent.
+  Then the pullback isolates the imaginary part, which effectively is a projection.
+  That is, any part of the adjoint $\Dcot{s}$ that is not tangent to the complex circle at $s$ will not contribute to $\Dcot{A}$.
+}
+
+The \mintinline{julia}{rrule} can be implemented as
+\begin{juliacode}
+function rrule(::typeof(logabsdet), A::Matrix{<:RealOrComplex})
+    # The primal function uses the lu decomposition to
+    # compute logabsdet.
+    # we reuse this decomposition to compute inv(A).
+    F = lu(A, check = false)
+    Ω = logabsdet(F)
+    s = last(Ω)
+    function logabsdet_pullback(ΔΩ)
+        (Δl, Δs) = ΔΩ
+        f = conj(s) * Δs
+        # imagf = 0 for real A and Δs
+        # imagf = im * imag(f) for complex A and/or Δs
+        imagf = f - real(f)
+        g = real(Δl) + imagf
+        ∂A = g * inv(F)' # g * inv(A)'
+        return (NO_FIELDS, ∂A)
+    end
+    return (Ω, logabsdet_pullback)
+end
+\end{juliacode}
+\section{More examples}\label{more-examples}
+
+For more instructive examples of array rules, see \cite{giles_extended_2008} (real vector and matrix rules) and the LinearAlgebra rules in ChainRules at \url{https://github.com/JuliaDiff/ChainRules.jl/tree/master/src/rulesets/LinearAlgebra}.
+
+\printbibliography[heading=subbibintoc]
+\end{refsection}
+
+\end{document}

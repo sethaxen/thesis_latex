@@ -1,0 +1,232 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\begin{refsection}
+
+
+\section{Introduction}\label{introduction-1}
+
+We consider here \emph{power series} functions of diagonalizable real and complex matrices.
+Given a function $f \colon \bbC \to \bbC$ that can be written as a power series of input $x$, that is,
+\[f(x) = \sum_{n=0} a_n x^n,\]
+we define its extension $F$ to complex square matrices $X$ with the analogous matrix power series
+\[F(X) = \sum_{n=0} a_n X^n.\]
+Common examples of $f$ and $F$ pairs are the scalar and matrix exponential, logarithmic, trigonometric, and hyperbolic functions.
+The matrix exponential is the motivating example here.
+
+That $f$ and $F$ are closely related can be seen if we restrict $X$ to the diagonalizable matrices
+\[X = V \Lambda V^{-1},\]
+where $V$ is an invertible matrix of eigenvectors, and $\Lambda = \diag(\lambda)$ is a diagonal matrix of eigenvalues $\lambda$.
+Diagonalizable matrices have the property that their matrix powers simplify to powers of the eigenvalues:
+\[X^n = (V \Lambda V^{-1})^n = V \Lambda^{\circ n} V^{-1} = V \diag(\lambda^{\circ n}) V^{-1},\]
+where $\left(\lambda^{\circ n}\right)_i = \lambda_i^n$.
+Consequently, the power series likewise simplifies:
+\[F(X) = \sum_{n=0} a_n V \Lambda^n V^{-1} = V \left( \sum_{n=0} a_n \Lambda^n \right) V^{-1} = V \diag(f \circ \lambda) V^{-1},\]
+where $\left(f \circ \lambda\right)_i = f(\lambda_i)$.
+
+That is, for diagonalizable matrices, the function $F$ of the matrix can be computed by applying the function $f$ with the same power series to each eigenvalue of $X$.
+Because all such function pairs $f$ and $F$ share this connection for the diagonalizable matrices, their forward- and reverse-mode automatic differentiation rules share a common form.
+
+\section{Forward-mode rule}\label{forward-mode-rule-1}
+
+For maximum generality, we will consider a modification of the functions $f$ and $F$, namely $f(x, \theta)$ and $F(X, \theta)$ for some scalar $\theta$.
+We will break the computation of $F(X, \theta)$ into several steps:
+\begin{align*}
+(\lambda, V) &= \operatorname{eigen}(X)\\
+\mu_i &= f(\lambda_i, \theta)\\
+M &= \diag(\mu)\\
+\Omega &= V M V^{-1}\\
+\end{align*}
+Section 3.1 of \cite{giles_extended_2008} gives the directional derivative of the eigendecomposition as
+\begin{align*}
+\diag(\Dtan{\lambda}) &= I \circ (V^{-1} \Dtan{X} V)\\
+\Dtan{V} &= V \left(W \circ \left(V^{-1} \Dtan{X} V \right) \right),
+\end{align*}
+where $\circ$ is the Hadamard (elementwise) product, $I$ is the identity matrix, and $W$ is the matrix with entries
+\begin{align*}
+W_{ij} = \begin{cases}
+(\lambda_j - \lambda_i)^{-1} \quad &\text{if } i \ne j\\
+0 \quad &\text{if } i = j
+\end{cases}.
+\end{align*}
+Note that $W$ is skew-symmetric, that is, $W = -\trans{W}$.
+
+$\Dtan{\mu}$ will depend on the directional derivative of $f$, that is
+\[\Dtan{\mu}_i = f_x(\lambda_i, \theta) \Dtan{\lambda_i} + f_\theta(\lambda_i, \theta) \Dtan{\theta}\]
+Designating $D = \diag(f_x \circ \lambda)$ and $E = \diag(f_\theta \circ \lambda)$, we can write $\Dtan{M}$ as
+\[\Dtan{M} = \diag(\Dtan{\mu}) = D \left(I \circ (V^{-1} \Dtan{X} V)\right) + E \Dtan{\theta}\]
+
+The pushforward of the final step is
+\begin{align*}
+\Dtan{\Omega}
+  &= \Dtan{V} M V^{-1} + V \Dtan{M} V^{-1} - V M V^{-1} \Dtan{V} V^{-1}\\
+  &= \left( \Dtan{V} M + V \Dtan{M} - V M V^{-1} \Dtan{V} \right) V^{-1},
+\end{align*}
+where we have used the directional derivative of the matrix inverse from \eqref{invdiff}.
+Substituting the derivatives from the previous steps, we find
+\begin{align*}
+\Dtan{\Omega}
+  &= \left( V \left(W \circ \left(V^{-1} \Dtan{X} V \right) \right) M +
+            V D \left(I \circ (V^{-1} \Dtan{X} V)\right) + V E \Dtan{\theta} -
+            V M V^{-1} V \left(W \circ \left(V^{-1} \Dtan{X} V \right) \right)
+     \right) V^{-1}\\
+  &= V \left(I \left(W \circ \Dtan{\Lambda} \right) M -
+             M \left(W \circ \Dtan{\Lambda} \right) I +
+             D \left(I \circ \Dtan{\Lambda} \right) I +
+             E \Dtan{\theta}
+     \right) V^{-1},
+\end{align*}
+where $\Dtan{\Lambda} = V^{-1} \Dtan{X} V$, and identity matrices have been added to highlight the similarity of the expressions.
+
+For any diagonal matrices $J$ and $K$, and any square matrices of the same size $A$ and $B$,
+\begin{align*}
+(J (A \circ B) K)_{ij} &= \sum_{kl} J_{ik} \delta_{ik} A_{kl} B_{kl} K_{lj} \delta_{lj}\\
+&= J_{ii} A_{ij} B_{ij} K_{jj}\\
+&= \left( J_{ii} A_{ij} K_{jj} \right) B_{ij}\\
+&= \left( \sum_{kl} J_{ik} \delta_{ik} A_{kl} K_{lj} \delta_{lj} \right) B_{ij}\\
+&= \left( \left( JAK \right) \circ B \right)_{ij}
+\end{align*}
+Therefore, we can simplify to
+\begin{align*}
+\Dtan{\Omega}
+  &= V \left( (W M) \circ \Dtan{\Lambda} - (M W) \circ \Dtan{\Lambda} + D \circ \Dtan{\Lambda} + E \Dtan{\theta} \right) V^{-1}\\
+  &= V (P \circ \Dtan{\Lambda} + E \Dtan{\theta}) V^{-1},
+\end{align*}
+where we call $P = (W M - M W + D)$ the \emph{pairwise difference quotient matrix}.
+Computation of $P$ is discussed in the following section.
+
+In summary, in terms of $P$, the pushforward of $\Omega = F(X)$ is
+\begin{align*}
+\Dtan{\Lambda} &= V^{-1} \Dtan{X} V\\
+\Dtan{\Omega} &= V \left( P \circ \Dtan{\Lambda} + E \Dtan{\theta} \right) V^{-1}.
+\end{align*}
+\section{The pairwise difference quotient matrix}\label{the-pairwise-difference-quotient-matrix}
+
+The entries of $P$ are
+\begin{align*}
+P_{ij}
+  &= \left( \sum_k W_{ik} M_{kj} \delta_{kj} - \delta_{ik} M_{ik} W_{kj} \right) +
+     \delta_{ij} D_{ij}\\
+  &= W_{ij} \mu_j - \mu_i W_{ij} + \delta_{ij} D_{ij}\\
+  &= W_{ij} (\mu_j - \mu_i) + \delta_{ij} D_{ij}\\
+  &= (1 - \delta_{ij}) \frac{f(\lambda_j) - f(\lambda_i)}{\lambda_j - \lambda_i} +
+     \delta_{ij} f'(\lambda_i)\\
+  &= \begin{cases}
+        f'(\lambda_i) \quad &\text{if } i = j,\\
+        \frac{f(\lambda_j) - f(\lambda_i)}{\lambda_j - \lambda_i} \quad &\text{if } i \ne j.
+     \end{cases}\\
+\end{align*}
+We can unify the two cases by defining $P_{ij}$ in terms of a limit:
+\begin{equation*}
+P_{ij} = \lim_{\epsilon \to 0}
+         \frac{f(\lambda_j + \epsilon) - f(\lambda_i)}{\lambda_j - \lambda_i + \epsilon}.
+\end{equation*}
+Expressed this way, we can see that the expression is defined for two important pathological cases.
+For degenerate matrices, where $\lambda_j = \lambda_i$ for some $i,j$, the corresponding entry is
+\begin{equation*}
+P_{ij} = \lim_{\epsilon \to 0}
+         \frac{f(\lambda_j + \epsilon) - f(\lambda_j)}{\epsilon}
+       = f'(\lambda_j) = f'(\lambda_i)
+\end{equation*}
+Diagonal and off-diagonal entries for singular matrices, where $\lambda_i=0$ for some $i$, require no special attention.
+
+However, for almost-degenerate matrices, which are more common due to numerical imprecision of the eigendecomposition, the naive computation of $P_{ij}$ can still suffer from roundoff error.
+We thus need a way to make the difference quotients more robust for $\lambda_j \approx \lambda_i$.
+One way to do this is to use the first-order Taylor expansion of $P_{ij}$ around $\Delta \lambda = \lambda_j - \lambda_i = 0$:
+\[P_{ij} = f'(\lambda_i) + \frac{\Delta \lambda}{2} f''(\lambda_i) + \mathcal{O}((\Delta \lambda)^2)\]
+However, this contains a second derivative, which some automatic differentiation systems may not be able to compute or which may be inefficient to compute.
+We can write the second derivative in terms of the Taylor series of the first derivative:
+\begin{align*}
+f'(\lambda_j) &= f'(\lambda_i) + f''(\lambda_i) \Delta \lambda + \mathcal{O}((\Delta \lambda)^2)\\
+\Delta\lambda f''(\lambda_i) &= f'(\lambda_j) - f'(\lambda_i) + \mathcal{O}((\Delta \lambda)^2)
+\end{align*}
+Inserting this expression and removing the higher order terms, we find
+\begin{align*}
+P_{ij} &= f'(\lambda_i) + \frac{1}{2} \left( f'(\lambda_j) - f'(\lambda_i) \right) +
+          \mathcal{O}((\Delta \lambda)^2)\\
+       &= \frac{1}{2} \left( f'(\lambda_j) + f'(\lambda_i) \right) +
+          \mathcal{O}((\Delta \lambda)^2)\\
+P_{ij} &\approx \frac{1}{2} \left( f'(\lambda_j) + f'(\lambda_i) \right)
+\end{align*}
+That is, when $(\Delta\lambda)^2 < \epsilon$ for some small $\epsilon$, we can approximate $P_{ij}$ with the average of the already-computed first derivatives of $f$, with a truncation error on the order of $\epsilon$, which could be taken for example to be machine epsilon $\epsilon_m$.
+
+However, we use this approximation to counteract the roundoff error of the exact expression, which by a standard error analysis will be on the order of $\frac{\epsilon_m}{\Delta\lambda}$.
+Consequently, the optimal $\epsilon$ that minimizes the total error is on the order of $\epsilon_m^{2/3}$, where the total error also on the same order.
+When using double-precision types, where machine epsilon is on the order of $10^{-16}$, the best possible precision of $P_{ij}$ for almost-singular matrices at this threshold will then be on the order of $10^{-11}$.
+
+\section{Reverse-mode rule}\label{reverse-mode-rule-1}
+
+The fundamental identity of reverse-mode rules given in \eqref{pbidentmat} here takes the form
+\begin{equation*}
+\Re \left( \tr \left( \hconj{\Dcot{\Omega}} \Dtan{\Omega} \right) \right) =
+\Re \left( \tr \left( \hconj{\Dcot{X}}      \Dtan{X}      \right) \right) +
+\Re \left( \conj{\Dcot{\theta}} \Dtan{\theta}  \right).
+\end{equation*}
+Substituting the pushforward into the left-hand side, we obtain
+\begin{align*}
+\Re \left( \tr \left( \hconj{\Dcot{\Omega}} \Dtan{\Omega} \right) \right)
+  &= \Re \left( \tr \left( \hconj{\Dcot{\Omega}} V \left( P \circ \Dtan{\Lambda} + E \Dtan{\theta} \right) V^{-1} \right) \right)\\
+  &= \Re \left( \tr \left( V^{-1} \hconj{\Dcot{\Omega}} V \left( P \circ \Dtan{\Lambda} + E \Dtan{\theta} \right) \right) \right)\\
+  &= \Re \left( \tr \left( \hconj{\Dcot{\Lambda}} \left( P \circ \Dtan{\Lambda} + E \Dtan{\theta} \right) \right) \right)\\
+  &= \Re \left( \tr \left( \hconj{\Dcot{\Lambda}} \left( P \circ \Dtan{\Lambda} \right) \right) \right) +
+     \Re \left( \tr \left( \hconj{\Dcot{\Lambda}} E \Dtan{\theta} \right) \right)
+\end{align*}
+where $\Dcot{\Lambda} = \hconj{V} \Dcot{\Omega} \invhconj{V}$.
+For symmetric $A$ and all other $B$ and $C$, we can write the following identity:
+\begin{align*}
+\tr(C (A \circ B)) &= \sum_{ijk} C_{ij} A_{jk} B_{jk} \delta_{ik}\\
+                   &= \sum_{ij} C_{ij} A_{ji} B_{ji}\\
+                   &= \sum_{ij} C_{ij} A_{ij} B_{ji}\\
+                   &= \tr((C \circ A) B)
+\end{align*}
+Also, for diagonal $E$ and any $A$, we can write:
+\begin{align*}
+\tr(A E) &= \sum_{ijk} A_{ij} E_{jk} \delta_{jk} \delta_{ik}\\
+         &= \sum_i A_{ii} E_{ii}\\
+         &= \inner{\diag^{-1}(\hconj{A})}{\diag^{-1}(E)}
+\end{align*}
+We can use these to bring $\Dtan{X}$ out of the Hadamard product and to simplify the $\Dtan{\theta}$ term:
+\begin{align*}
+\Re \left( \tr \left( \hconj{\Dcot{\Omega}} \Dtan{\Omega} \right) \right)
+  &= \Re \left( \tr \left(  \left( P \circ \hconj{\Dcot{\Lambda}} \right) V^{-1} \Dtan{X} V \right) \right) +
+     \Re \left( \tr \left( \hconj{\Dcot{\Lambda}} E \right) \Dtan{\theta} \right)\\
+  &= \Re \left( \tr \left( V \left( P \circ \hconj{\Dcot{\Lambda}} \right) V^{-1} \Dtan{X} \right) \right) +
+     \Re \left( \inner{\diag^{-1}(\Dcot{\Lambda})}{\diag^{-1}(E)} \Dtan{\theta} \right)
+\end{align*}
+Comparing to the right-hand side of \eqref{pbidentmat}, we solve for $\Dcot{X}$, giving the pullback function:
+\begin{align*}
+\Dcot{\Lambda} &= \hconj{V} \Dcot{\Omega} \invhconj{V}\\
+\Dcot{X} &= \invhconj{V} \left( \conj{P} \circ \Dcot{\Lambda} \right) \hconj{V}\\
+\Dcot{\theta} &= \inner{\diag^{-1}(E)}{\diag^{-1}(\Dcot{\Lambda})}
+\end{align*}
+It is striking that the forms of $\Dtan{\Omega}$ and $\hconj{\Dcot{X}}$ are so similar for $\Dtan{\theta}=0$.
+
+\section{Power series functions of Hermitian matrices}\label{power-series-functions-of-hermitian-matrices}
+
+For a Hermitian matrix $X$, where $X = \hconj{X}$, the eigenvectors are unitary $U$ where $U \hconj{U} = \hconj{U} U = I$, and the eigenvalues are real.
+$\Dtan{X}$ will also be Hermitian.
+The pushforwards and pullbacks then simplify:
+\begin{align*}
+\Dtan{\Lambda} &= \hconj{U} \operatorname{herm} \left( \Dtan{X} \right) U\\
+\Dtan{\Omega} &= U \left( P \circ \Dtan{\Lambda} + E \Dtan{\theta} \right) \hconj{U}\\
+\Dcot{\Lambda} &= \hconj{U} \Dcot{\Omega} U\\
+\Dcot{X} &= \operatorname{herm} \left( U \left( \conj{P} \circ \Dcot{\Lambda} \right) \hconj{U} \right)\\
+\Dcot{\theta} &= \inner{\diag^{-1}(E)}{\diag^{-1}(\Dcot{\Lambda})},
+\end{align*}
+where $\operatorname{herm}(A) = \frac{1}{2} \left( A + \hconj{A} \right)$ is an operator that makes a matrix Hermitian and is used above to enforce the necessary Hermitian constraints when a non-Hermitian tangent or cotangent vector is passed to the pushforward or pullback, respectively.
+
+If $f$ is a real function, that is, $f \colon \bbR \to \bbR$, then $\Omega = F(X)$ is always Hermitian with the same eigenvectors as $X$; consequently, $\Dcot{\Omega}$ will also be Hermitian.
+Moreover, $\conj{P} = P$, and the forms of the pushforward and pullback are identical for $\Dtan{\theta}=0$.
+
+For $f \colon \bbR \to \bbC$, if $X$ is a real Hermitian matrix, then $U$ is real, and $\Omega = F(X)$ is a complex symmetric matrix:
+\[\Omega = U f(\Lambda) \hconj{U} = U \Re(f(\Lambda)) \hconj{U} + i U \Im(f(\Lambda)) \hconj{U}\]
+
+If, on the other hand, $X$ is a complex Hermitian matrix, then $\Omega$ is neither symmetric nor Hermitian.
+In fact, it is the sum of a Hermitian and a skew-Hermitian matrix.
+However, because all complex square matrices can be written as such a sum, this does not tell us anything about its structure.
+
+\printbibliography[heading=subbibintoc]
+\end{refsection}
+
+\end{document}

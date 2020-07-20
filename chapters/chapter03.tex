@@ -1,0 +1,190 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\begin{refsection}
+
+\section{Abstract}\label{abstract}
+
+We introduce a conceptual framework \todo{roadmap?} for inferring structural ensembles of macromolecules.
+We present best practices for constructing principled, Bayesian scoring functions on these representations, testing the assumptions in the used information, and converting the information into inferences on properties of individual structures.
+We demonstrate a computational application of the framework for inferring structural ensembles of a protein with multiple rigid domains using simulated and measured Nuclear Overhauser Effect measurements.
+
+\section{Introduction}\label{introduction}
+
+Due to both heterogeneity within a single sample and differences between different physical samples, data gathered for integrative structure determination often describe ensembles of structures, not merely single structures.
+Nevertheless, these data are often used to model a single structure (i.e.~single-state modeling).
+With increasingly informative data, more detailed questions may be addressed;
+however, when the variation in the ensemble is sufficiently high, as the amount of information increases, the error from the single-state approximation will eventually place a bound on the achievable accuracy and precision.
+For example, fitting a single side chain structure to NMR nuclear Overhauser effect (NOE) data from two rotamers may produce an incorrect representative structure.
+In such cases, an ensemble representation may be more appropriate.
+
+In general, any modeling a system requires information about the system, a representation of the system, a scoring function, and a sampling algorithm.
+Information about the system can broadly be divided into two categories:
+First, data have been measured through interaction of some experimental apparatus with the system of interest under some conditions.
+Second, prior information consists of domain expertise, such as the knowledge that two atoms cannot occupy the same space, and results of earlier modeling efforts.
+When multiples types of information are used to compute structural models of biomolecules, this is typically called integrative structural modeling \todo{fix}.
+A representation is a set of variables that describe the system at some resolution and any other variables that can be determined by the information, such as the magnitude of noise; a configuration is a single realization of those variables, while a sample is a set of configurations.
+A scoring function maps a configuration to a real number that is used to evaluate consistency of any given configuration with the information.
+A sampling algorithm generates candidate configurations using the scoring function.
+\todo{find better term than "configuration"}
+
+In \emph{Bayesian inference}, the scoring function used for modeling is the logarithm of a posterior density
+
+$$p(M \mid D, I) \propto p(M \mid I) p(D \mid M, I),$$
+
+where $M$ is a configuration, $D$ is the data, and $I$ is the prior information.
+$p(M \mid I)$ is the density for the prior distribution of $M$ that depends on the prior information.
+The conditional probabilities in the prior indicate that the prior generates candidate configurations consistent with prior information.
+$p(D \mid M, I)$ is a likelihood function that defines the probability of observing a set of data conditioned on a configuration.
+The likelihood generates candidate datasets using a model of the physical process that generated the data, complete with a model for the sources of error such as noise.
+A sampling algorithm compatible with Bayesian inference generates a sample of size $N$ such that averages over the sample converge with increasing sample size to the same averages over the true posterior distribution.
+Examples of such averages are moments such as means and variances and inverse probabilities used to compute medians and other quantiles.
+Markov Chain Monte Carlo (MCMC) methods are a widely used class of samplers that under optimal conditions can produce such a sample.
+
+In \emph{ensemble modeling}, an \emph{ensemble representation} is a set of variables that define a probability distribution on the structure.
+Like structural variables in single-state modeling, the variables that parameterize the ensemble are also sampled to satisfy measured data and prior information.
+
+There are several special cases of ensemble representations: \todo{ADD ONE EXAMPLE FOR EACH USING STRUCT BIO LANGUAGE}
+1) \emph{Single-state} representations consist of a single representative structure, which is a discrete distribution with a single mode that contains the entire population.
+2) \emph{Continuum} representations consist of a continuous distribution on structural degrees of freedom.
+3) \emph{Multi-state} representations are mixture models with discrete or continuous components, whose weights are the population proportions.
+
+An ensemble representation must be both useful and feasible.
+A useful representation enables a model to be used to answer the questions of interest.
+A feasible representation enables a model to be computed from available data.
+The latter requirement poses key challenges, as relating the ensemble model to data usually takes the form of computing multiple high-dimensional averages of some function of the structural degrees of freedom over the ensemble distribution many times during sampling.
+
+A molecular mechanics force field is usually thought of as a prior.
+However, it is also a model that defines a distribution for a structure in terms of structural features such as bond lengths and angles.
+In fact, it can be thought of as an ensemble model.
+
+In integrative modeling, molecular mechanics force fields are often used as prior distributions for coordinates of atomic resolution structures.
+However, a force field can also be used as an ensemble representation, as in force field fitting.
+Considered in isolation, a single term of a force field effectively defines a probability distribution of the coordinates of the atoms included in the term.
+At this level, the force field is both useful and feasible; hence, force field fitting typically considers such terms in isolation.
+Combining all terms of a force field for a structure defines a new distribution on the whole structure;
+the resulting distribution can generally only be understood, and averages can only be computed with respect to it, by drawing samples from the distribution using expensive algorithms such as MCMC or molecular dynamics (MD).
+While force fields are useful as scoring functions, they are therefore only useful and feasible representations for ensemble modeling of very small molecules.
+
+Here, we develop a framework and specific application for efficient ensemble inference using continuum representations.
+We define \emph{ensemble inference} as the application of Bayesian inference to identify multiple ensembles that satisfy the datatset, thereby obtaining uncertainties on any properties of the ensembles.
+When considering data informing individual force field terms, ensemble inference takes the form of Bayesian force field fitting \cite{REF}.
+Such inference when employed to a macromolecule, even with only a single state representation, poses intense computational challenges.
+We address these challenges for a specific set of systems; namely, those where the majority of the ensemble motion occurs between domains or subunits that can be well approximated as rigid bodies.
+For systems where the variation in the relative positions of the bodies follows a continuum, we introduce a continuum representation, termed a \emph{kinematic ensemble representation}.
+We develop the necessary tools to efficiently approximate certain data from these continuum models, sample them, and analyze them.
+We demonstrate the technique on such a system of rigid bodies using simulated and measured NMR Nuclear Overhauser Effects (NOEs).
+Furthermore, we introduce a roadmap for generalizing this approach to other types of systems and measured data.
+
+\section{Approach}\label{approach}
+
+Here, we explain conceptually the approach used in this work.
+For details, see Supporting Methods.
+
+To begin modeling an ensemble, we must first select a useful and feasible representation.
+A representation is useful when the corresponding model answers questions of interest.
+A representation is feasible when a corresponding modeling method exists; such a method requires an accurate posterior density given the input information as well as sufficient sampling of posterior with available computational resources.
+
+For example, one ensemble representation is a set of weights of states determined from some previous analysis.
+The weights can be interpreted as state populations.
+The number of weights is the number of states, which renders it feasible for sampling.
+Fitting these weights to data is called ensemble reweighting.
+
+We develop here an ensemble representation for macromolecules that approximately satisfies the following requirements, each explained below:
+1) The ensemble is kinematic; that is, protein domains are rigid, and all motion occurs between domains.
+2) The relative motion between any two connected domains is independent of the relative motions between any other two domains.
+3) The relative motion between two connected domains consists of symmetric perturbations from a representative pose.
+
+A \emph{kinematic tree} representation has two components: a tree topology and a set of transformations.
+The topology is a connected directed acyclic graph; in our framework, every edge is directed away from the root.
+The root of the tree is a unique node that represents a global reference frame.
+Each node of the tree represents a rigid body with an implicit pose (a position and orientation) with respect to the global reference frame.
+Each edge corresponds to the transformation (relative pose) between two connected bodies; in the opposite direction, the transformation is inverted.
+There is exactly one path between any two nodes.
+The relative pose between two rigid bodies is obtained by multiplying the transformations along the unique path between the two rigid bodies.
+Because all pairwise transformations are implicitly encoded within the tree, the tree represents the entire macromolecule.
+
+A \emph{kinematic ensemble} is a distribution of kinematic trees, where the topology is fixed, and only the transformations of the edges vary.
+We can construct a kinematic ensemble from a kinematic tree by replacing the transformation at each edge with a distribution of transformations.
+These distributions give the relative motion between two connected bodies.
+Unlike transformations in the kinematic tree, we cannot easily obtain corresponding distributions on pairwise transformations between any two bodies in the kinematic ensemble.
+To do so, we must assume that each edge distribution is conditionally independent of all other edge distributions.
+The distribution of the transformation between any two nodes is then the \emph{convolution} of each of the distributions along the unique path between the nodes; the convolution of multiple distributions of transformations is the distribution of the resulting combined transformation.
+
+In general, densities of convolution distributions are computationally too expensive to compute, because they involve numerically computing an integral for each convolution.
+However, if we select for each edge distribution one whose density can be represented as a weighted superposition of \emph{harmonic bases} (``ripples'' that generalize Fourier basis functions; SI), then the density of the convolution is the same weighted superposition, where the combined weights are products of the weights along the same path.
+A key caveat to this approach is that harmonic representations are approximations of the corresponding distributions.
+Their accuracy degrades as the distributions become sharp; consequently, this approach is most appropriate for broad pairwise transformation distributions.
+
+One distribution that is natively expressed in harmonics is a diffusive normal distribution \cite{chirikjian_harmonic_2016}.
+Informally, a diffusive normal distribution of rigid transformations describes driftless rigid diffusion about a centroid transformation with a positive semidefinite diffusion matrix that for a narrow distribution plays the role of a covariance matrix.
+It is symmetric about the centroid.
+A diffusive normal with a fixed orientation is a multivariate normal distribution, which arises from translational Brownian motion \cite{REF}.
+With the translation fixed, it is the distribution resulting from rotational Brownian motion \cite{chirikjian_harmonic_2016}.
+This distribution can represent various motion distributions, such as those resulting from primarily hinge, shear, or twist motions \todo{USE MORE PRECISE TERMS}.
+More complicated motions can be expressed with mixtures, analogous to Gaussian mixture models, with only a linear increase in time complexity with increasing mixture components.
+We therefore represent the edge distributions using mixtures of diffusive normal distributions.
+
+As a result, a kinematic ensemble is a distribution of kinematic trees and, consequently, of the positions and orientations of all structural components represented by the tree.
+From this ensemble, we obtain harmonic representations of transformation distributions between structural components represented by any two nodes.
+By integrating out non-contributing degrees of freedom (\emph{marginalization}), we can in principle simultaneously approximate distributions of distances between any two atoms, rotations between any two orientations, and angles between any two directions within the ensemble;
+for example, if a measurement only informs distances, orientational components are non-contributing.
+These distributions can then be used to construct continuous ensemble forward models for measured quantities.
+To illustrate the approach in more detail, we compute many pairwise distance distributions from a single kinematic ensemble and compare them with NMR NOE measurements, with a time complexity that scales linearly with the number of rigid bodies (SI).
+In contrast\ldots{} \todo{COMPARE WITH 6D QUADRATURE}
+
+We adopt a previously developed expression \todo{LIKELIHOOD} for computing NOE intensity from a distance between a pair of spins, subject to a log-normal noise model \cite{rieping_inferential_2005} with a single error term $\sigma$; the noise model accounts for uncertainty origination from experimental noise, the representation, and the forward model.
+When this expression is applied to an ensemble of distances, the NOE intensity $I$ is approximated as $I = \gamma \left\langle r^{-6} \right\rangle$, where $r$ is the internuclear distance for a pair of atoms, $\gamma$ is an unknown scaling factor that must be inferred, and $\langle \cdot \rangle$ is an average over the ensemble.
+To compute the ensemble averages, we left-truncate each internuclear distance distribution at the Van der Waals diameter for that atomic pair, because non-zero density at very low distances are physically unrealistic (SI);
+this truncation avoids the problem of averages that do not converge to finite values.
+
+We now discuss the prior terms in the scoring function.
+For the ($\gamma$) and ($\sigma$) terms in the likelihood, we use weakly informative Half-$t$ distributions with degrees of freedom $\nu=30$ and scale parameter of 1.
+The rigid body degrees of freedom are decomposed into orientations and translations.
+A uniform prior is placed on orientations, while a dispersed multivariate normal prior of $\operatorname{Normal}(0, 1000)$ is placed on translations in each dimension in angstroms; this prior is effectively a boundary restraint.
+The diffusion matrices are factorized into a diagonal matrix of standard deviations and a correlation matrix.
+The standard deviations are restrained with a Half-Normal prior with scale of 10 in angstroms, and the correlation matrix is restrained with an LKJ prior with shape parameter of 2, which is effectively a uniform prior on the space of correlation matrices.
+
+The ensemble degrees of freedom are the centroid transformations and a $6 \times 6$ diffusion matrix for the diffusion around each transformation; each transformation consists of a rotation followed by a translation.
+Each parameter is sampled by first transforming it to unconstrained real space, with the necessary modification to the scoring function to ensure the same posterior distribution is targeted (SI).
+We use dynamic Hamiltonian Monte Carlo (HMC) \cite{betancourt_geometric_2014,betancourt_conceptual_2018}, a Markov Chain Monte Carlo (MCMC) method, to sample all parameters simultaneously.
+
+We employ several techniques to analyze the posterior sample of ensembles.
+A posterior sample of ensembles effectively produces an ensemble of ensembles, which is considerably more challenging to analyze and interpret than an ensemble of single structures.
+
+The first group of analyses considers the sampled variables that parameterize the ensemble.
+They include sampling diagnostics as well as analyses of the ensemble of centroid structures around which the ensembles fluctuate.
+Standard diagnostics such as the the rank-normalized potential scale reduction factor ($\hat{R}$), effective sample size (ESS), energy Bayesian fraction of missing information (EBFMI), and divergence checks are used to identify common causes of sampling bias.
+$\hat{R}$ compares the between-chain and within-chain variance of each parameter for all pairs of MCMC chains to identify chains that have not yet converged \cite{vehtari_rank-normalization_2020}.
+ESS estimates the effective number of independent samples in an autocorrelated MCMC chain.
+EBFMI and divergence checks are HMC-specific diagnostics that informally identify heavy tails and high curvature in the posterior distribution, which prevent chains from converging to the true posterior distribution \cite{betancourt_diagnosing_2016,betancourt_hamiltonian_2013}.
+
+The second group of analyses relies on the fact that each ensemble is a distribution, allowing us to randomly draw from it a single sampled kinematic tree.
+This collection of sampled kinematic trees across all ensembles is a posterior distribution of ensemble members and can therefore be analyzed using standard methods for analyzing structures produced during integrative structure determination.
+In particular, we employ previously developed methods to assess sampling convergence and sampling precision of atomic coordinates \cite{viswanath_assessing_2017}.
+This ensemble member posterior can also be directly compared to non-ensemble kinematic tree posteriors.
+
+The third group of analyses focuses on assessing the fit of the model to the data.
+For each draw from the posterior distribution, we simulate an NOE measurement using the likelihood, which produces a posterior distribution on measured NOE intensities called the \emph{posterior predictive} distribution.
+We used approximate Leave-One-Out (LOO) cross-validation \cite{vehtari_practical_2017,vehtari_pareto_2019} implemented in the package ArviZ \cite{kumar_arviz_2019} to assess the sensitivity of the posterior samples to each data point.
+
+We used the kinematic ensemble method to fit NOESY intensities measured from Calmodulin (CaM) \cite{REF}. \todo{ADD EXPERIMENTAL CONDITIONS}
+Data were downloaded from the Biological Magnetic Resonance Data Bank (BMRB ID: XXX), while the deposited spin assignments in RCSB PDB (PDB: XXX) were used.
+Rigid bodies were defined using DynDom \cite{lee_dyndom_2003,qi_comprehensive_2005} (DynDom ID: XXX).
+Data corresponding to intra-domain spin pairs were discarded.
+Several types of kinematic ensemble models were fit to the data.
+First, we fit ensemble models with only translational motion.
+These were divided into two classes: one with radially asymmetric distributions and one with radially symmetric distributions, the latter being considerably more efficient to evaluate.
+Second, we fit ensemble models with both translational and orientational motion.
+Again, we fit two variants: one with where translations and orientations co-vary and one where they vary independently and are radially symmetric.
+\todo{WE NEED AN INSILICO BENCHMARK. ALSO AN ORTHOGONAL DATASET TO VALIDATE AGAINST, ONE THAT IDEALLY UNAMBIGUOUSLY INDICATES ENSEMBLE PROPERTIES UNDER SIMILAR CONDITIONS}
+
+\section{Results}\label{results}
+
+\section{Discussion}\label{discussion}
+
+\printbibliography[heading=subbibintoc]
+\end{refsection}
+
+\end{document}
