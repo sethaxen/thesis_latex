@@ -1,0 +1,382 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Inferring ensembles of macromolecular structures} \label{ensemble-inference}
+\chaptermark{Inferring macromolecular ensembles}
+
+\begin{refsection}
+
+	\section{Abstract}\label{abstract}
+
+	Data collected for macromolecular structure determination often inform heterogenous conformational ensembles.
+	In such cases, structural models that explicitly represent ensembles may be more appropriate than representations of single structures.
+	When the ensemble is broad or the data informs rare states, it is computationally expensive to fit the data with an ensemble representation comprised of many discrete states.
+	We introduce a continuous ensemble representation of systems consisting of rigid bodies for cases such as these.
+	It explicitly encodes a smooth approximation to a distribution of structures and thus is sensitive to rare states.
+	To facilitate quantification of uncertainty of ensemble models, it is designed to be used in standard Bayesian inference workflows.
+	We demonstrate a computational application of the framework for inferring structural ensembles of a protein with multiple rigid domains using simulated and measured nuclear Overhauser effect measurements.
+
+	\section{Introduction}\label{introduction}
+
+	% \todo{add paragraph titles}
+	%\todo{include more references}
+
+	% \todo{more notes about visualization. e.g. can visualize diffusion matrix of individual joints, can draw samples and do PCA in rigid body space, etc}
+
+	%% Data are usually derived from ensembles, and as data get better, we need more ensemble models
+
+	Data gathered by structural biologists often describe a mixture of structures (\ie an ensemble), not merely a single structure,
+	due to both heterogeneity within a single physical sample and differences between samples.
+	Nevertheless, these data are commonly used to model a single structure (\ie a single state).
+	With increasingly informative data, more detailed structural questions may be addressed.
+	Addressing these questions requires accurate, precise, and complete models.
+	However, when the variation in the ensemble is sufficiently high, the error from the single-state approximation limits the achievable accuracy and precision.
+	For example, fitting a single side chain structure to NMR nuclear Overhauser effect (NOE) data from two rotamers may produce an incorrect representative structure.
+	In such cases, an ensemble representation of the molecule, consisting of two structures, may be more appropriate.
+	%% Modeling requires information, representation, scoring, and sampling
+
+	In general, modeling a system involves four components: 1) information about the system, 2) a representation of the system, 3) a scoring function, and 4) a sampling algorithm.
+	Information about the system can broadly be divided into two categories:
+	First, data are measured by an instrument interacting with the system under some conditions.
+	%\todo{ elaborate somewhere on data uncertainty/error: the exact conditions or how interaction with the instrument changes the system may only be partially understood.}
+	Second, prior information consists of earlier models and domain expertise.
+	Integrative structural determination synthesizes both types of information to compute structural models.
+	A representation is a set of variables that describes the system at some level of detail and any other variables that can be determined by the available information, such as the magnitude of noise.
+	We call a single realization of these variables a draw, while a sample is a collection of draws.
+	A scoring function (\eg the logarithm of the density function of a posterior distribution) assigns to each draw a real number called a score, which is used to evaluate consistency of any given draw with the information.
+	A sampling algorithm uses this scoring function and any user-provided constants to generate draws.
+
+	%% Ensemble modeling requires an ensemble representation, which must be useful and feasible; the choice of representation places tight constraints on the sampling techniques available
+
+	Accordingly, once data informing an ensemble has been collected, modeling an ensemble of structures first requires an ensemble representation.
+	Such a representation must be useful for answering questions of interest.
+	It also must be feasible, in that its variables can be sampled with available methods and computational resources.
+	Representations of single structures are typically high-dimensional.
+	Scoring functions used for structural modeling, such as potential energies encoded in molecular mechanics force fields, usually have geometric properties, such as high curvature (\eg stiff Lennard-Jones potentials) and multi-modality (\eg multi-well potentials), that present obstacles for efficiently sampling single structures.
+	These obstacles have motivated simpler representations, such as fixed bond lengths, coarse-grained beads, and rigid domains; the latter two representations are especially applicable when the system is very large and/or a high resolution structural model is not needed.
+	The sampling challenges in ensemble modeling are expected to be much worse than for modeling single structures, due to the presence of many more degrees of freedom.
+	As a result, the choice of ensemble representation and sampling technique are especially important for the feasibility of ensemble modeling.
+	In particular, we usually have a trade-off between the complexity of the ensemble representations and the complexity of the sample of ensembles.
+
+	%% Existing ensemble methods produce either a single ensemble or a distribution of ensembles.
+
+	When modeling single structures, methods can generally be divided into two groups: those that produce a single structure that satisfies the information used and those that produce a sample of alternative structures, each of which satisfies the information.
+	Ensemble modeling methods can generally be divided into the same two groups.
+	In the first group, most methods are a form of ensemble reweighting: initial sampling, often molecular dynamics simulations, produces an initial ensemble.
+	Data and potentially other information are then used to assign weights corresponding to population frequencies to members of the ensemble to optimize an objective function.
+	Typically in the reweighting step, the structural degrees of freedom are fixed.
+	Because the method separately samples the structural and weight degrees of freedom, because the weights are optimized, and because it produces a single ensemble as output, it is typically efficient and can handle a large number of states.
+	Moreover, as new data becomes available, re-optimizing the weights takes little additional effort.
+	%\todo{Note where it works well, \eg IDPs}
+	Success of reweighting approaches depends on the initial ensemble being very close to the actual ensemble that produced the data.
+	Moreover, while these techniques may use a posterior distribution to account for uncertainty in the available information (below), the ensemble they return is generally a point estimate of the posterior distribution and thus underestimates the uncertainty in the ensemble.
+
+	In the second group, most methods are a form of multi-state (or replica-averaged) modeling.
+	In multi-state modeling, the ensemble is approximated as a weighted or unweighted mixture of some number of indexed states.
+	Both the structural variables and the weights are restrained using the scoring function and are simultaneously sampled.
+
+	%% Multi-state modeling is convenient because we can re-use existing sampling techniques, and in many cases we can compute ensemble average data by taking the arithmetic mean of some function over the states.
+
+	Multi-state modeling has several computationally convenient properties.
+	First, existing structural sampling techniques can be applied independently to each state; the states are generally only coupled via the scoring function.
+	For example, \cite{bonomiMetadynamicMetainferenceEnhanced2016} sample multiple states in parallel using molecular dynamics simulations, where the force field applied to each state is augmented with a data restraint.
+	Moreover, many types of data can be simulated as an average of a function over the ensemble (\ie an ensemble forward model), which for discrete states reduces to an arithmetic mean.
+	Because the states are typically sampled in parallel, the forward models for the individual states can be computed in parallel, and the scoring function can be computed efficiently.
+
+	%% Multi-state modeling is not always appropriate. Its time complexity for inference scales as O(n!), so it is only appropriate when the system consists of a small number of narrow distributions, i.e. a mixture model.
+
+	However, multi-state modeling is not always useful and feasible.
+	As the ensemble becomes more heterogenous and the questions of interest become more detailed, more states become necessary to approximate the ensemble.
+	Moreover, some types of data are highly sensitive to rare states.
+	For example, ensemble average NOE and F{\"o}rster resonance energy transfer (FRET) measurements both depend on an average $r^{-6}$ term, where $r$ is a distance \supercite{brungerThreedimensionalStructureProteins1986,cloreApplicationMolecularDynamics1986,fletcherTreatmentNOEConstraints1996,schulerSingleMoleculeFRETSpectroscopy2016}.
+	This term heavily weights states with low $r$, so that a specific data point exclusively reports on these rare states.
+	To both satisfy such data and prior information, a multi-state method may need to represent both the very low and very high density regions of the ensemble well, which could require many states \supercite{bonomiPrinciplesProteinStructural2017}.
+	The number of variables in the ensemble scales linearly with the number of states.
+	However, if the states are identical, swapping any two states and their weights, or equivalently swapping the indices of the states, produces the same score.
+	As a result, the number of modes in the scoring function scales as $\order{n!}$, where $n$ is the number of states.
+	Thus, without some way of breaking the symmetry between the states in the scoring function or a post-processing step such as clustering to swap indices of states, the time complexity of sampling to convergence quickly becomes prohibitive\footnote{
+		A two-state ensemble is only twice as expensive to sample as a four-state model, but a four-state ensemble is approximately 24 times more expensive.}.
+	If the properties of the distribution of ensembles are not of interest and downstream analysis is only concerned with the distribution of ensemble members, one can discard the indices, thus pooling all states into a single ensemble.
+	This technique has the consequence that the resulting distribution of states blends the variation due to hetereogeneity in the system and the variation due to uncertainty in the used information.
+	Multi-state modeling is thus most appropriate for systems and analyses where the ensemble resembles a weighted sum of a small number of narrow distributions or where a single ensemble of structures is desired.
+
+	%% Our goal is Bayesian inference of ensembles, a special case of the latter; its most common example is multi-state modeling;
+
+	% \todo{adopt Dina's terminology and cite}
+	The input information for structural modeling is always subject to various kinds of uncertainty\supercite{schneidman-duhovnyUncertaintyIntegrativeStructural2014}: examples are sparsity of measurements, experimental noise, ambiguity of assignment of data to structural components, resolution of the input data, deviation of the representation from the actual system, and approximations made in the forward models.
+	Such uncertainties are reflected in the resulting models.
+	Ideally, we could directly propagate these uncertainties through the modeling process to obtain commensurate uncertainties on all properties of the modeled system.
+	Bayesian inference is a principled approach to accomplish this.
+	In a standard inference workflow, a statistical model for the errors and uncertainty in the available information is constructed.
+	This defines a distribution of models from which a sample is drawn; the variation in the sample reflects the uncertainty in the variables consistent with the used information.
+	To rigorously quantify uncertainty in ensemble models, we therefore seek employ Bayesian inference.
+
+	%% We would ideally have a library of ensemble representations, each compatible with Bayesian inference, and each appropriate in different scenarios.
+
+	Different analyses require different representations and sampling techniques.
+	It is thus advantageous to have a library of representations for these different scenarios.
+	For ensemble inference, we require representations for which it is feasible to generate a distribution of ensembles for either narrow or broad ensembles, with one or many modes, at high or low resolution.
+	Moreover, we need efficient techniques for simulating data from these ensembles.
+
+	%% Our goal is to contribute a continuous ensemble representation for applications where atomic resolution of ensemble members is not needed but where multi-state modeling is infeasible.
+
+	Here, we contribute an additional ensemble representation to this library, the kinematic ensemble representation.
+	For systems where the majority of the ensemble motion occurs between relatively rigid domains or subunits, this representation smoothly approximates an ensemble of structures, including rare states, obviating the need to represent a large number of discrete states with many variables.
+	We develop the necessary tools to efficiently simulate certain data from these continuum representations, sample ensemble variables, and analyze the resulting ensembles in a Bayesian inference workflow.
+	We demonstrate the technique on such a system of rigid bodies using simulated and measured NMR nuclear Overhauser effect intensities (NOEs).
+	Finally, we discuss ways to generalize the approach.
+
+	\section{Approach}\label{approach}
+
+	Here, we outline the approach, while the details are given in \cref{ensemble-inference-si}.
+
+	%% Being useful and feasible in the context of Bayesian inference means being able to reproduce observables (i.e. with posterior predictive distributions), with a representation that is biologically interpretable and for which we can sample the distribution to convergence using MCMC methods.[mention numerical integration, then MCMC]
+
+	To begin inferring an ensemble, we must first select a useful and feasible representation.
+	In Bayesian inference, a statistical model is constructed to relate the data and prior information to the variables.
+	This statistical model defines a target distribution for the variables called a posterior distribution.
+	Given observed data $d$, prior information $\iota$, and variables $\theta$, we write the density of the posterior distribution as
+	$$\pi(\theta \mid d, \iota) \propto \pi(d \mid \theta, \iota) \pi(\theta \mid \iota),$$
+	where $\pi(d \mid \theta, \iota)$ term is the likelihood function that evaluates the consistency of the current $\theta$ with the measured data using a model of the physical process that generated the data.
+	The likelihood often decomposes into a forward model, which simulates noiseless data from $\theta$, and a noise model, which accounts for various sources of uncertainty.
+	$\pi(\theta \mid \iota)$ is the density of the prior distribution, relating the current $\theta$ to the prior information.
+	The scoring function is the logarithm of the posterior density\footnote{
+		In structural biology, it is more common to use the negative logarithm of the posterior as the score, by analogy to potential energy.
+		Here, we use the positive logarithm, which is the more common convention in the statistical literature.}.
+
+	In principle, once the posterior is defined, the model is specified.
+	Analyzing a posterior distribution requires computing expectations (averages) of functions weighted by the posterior; examples of such averages are means, variances, and quantiles.
+	The required integrals often cannot be analytically computed.
+	Thus, numerical integration is needed, in turn requiring a representation that allows numerical integration over the distribution of ensembles with available computational resources.
+	The most useful methods for such numerical integration are Markov Chain Monte Carlo (MCMC) methods.
+	MCMC methods generate a discrete sample of draws, for which the arithmetic mean of a function over the sample ideally approximates the corresponding numerical integral over the actual posterior distribution.
+
+	%% We therefore want a representation of a distribution of structures from which we can draw samples, against which we can efficiently compute ensemble forward models (usually averages of some function of interest), and which have as few redundant (and therefore correlated) parameters as possible, as these produce geometric artifacts that obstruct sampling
+
+	% \todo{start with single-state and talk about how distribution is a consequence of heterogeneity in sample and uncertainty; difficult in general to deconvolve.}
+
+	Analyzing a sample of ensembles can be challenging, in part because it is a distribution of distributions.
+	Using an ensemble representation better positions us to analyze the contribution to a model of two sources of variation: the actual heterogeneity in the system and the uncertainty in the available information.
+	While the spread of the ensemble is meant to approximate the heterogeneity in the measured system, the spread of the posterior distribution approximates the uncertainty in the proposed ensembles subject to the assumptions in the model.
+
+	Because $\theta$ parameterizes an ensemble of structures $x$, we can write the density of the posterior distribution of structures as
+	$$\pi(x \mid d, \iota) = \int_{\theta \in \Theta} \pi(x \mid \theta) \pi(\theta \mid d, \iota) \dd{\theta},$$
+	where $\Theta$ is the set of all ensembles expressible with the chosen ensemble representation.
+	We can draw a sample of $x$ from the structural posterior with the following procedure:
+	first, we draw a $\theta$ from this ensemble posterior.
+	Second, we draw an $x$ from the ensemble defined by $\theta$.
+	Third, we discard $\theta$.
+	This procedure enables standard structural analysis methods to be applied to this posterior sample.
+	% \todo{think of logical flow. reminder reader where we have been and where we are going. use first sentences for this.}
+
+	%% We propose such a distribution for ensembles where the majority of fluctuation is between relatively rigid domains and for which an atomic resolution ensemble model is not needed.
+
+	We therefore require that we can 1) draw sample structures from our ensemble representation, 2) efficiently simulate ensemble data from the ensemble, and 3) efficiently sample the variables within a standard Bayesian inference, as previously discussed.
+	Here, we develop such an ensemble representation for macromolecular ensembles that have the following qualities:
+	1) The ensemble is kinematic.
+	An ensemble is kinematic when a modeled system consists of rigid bodies (\eg secondary structure units, domains, and subunits of a complex), and thus all relevant motion to be modeled occurs between rigid bodies.
+	2) The relative motion between any two interacting rigid bodies is independent of the relative motion between any other two rigid bodies.
+	% \todo{make distinciton between precision of a model and precision of a landscape, corresponds to large minima with lots of probability mass}
+
+	%% Kinematic ensembles and trees
+
+	A kinematic ensemble is a distribution of kinematic trees.
+	A kinematic tree representation has three components: a tree topology, a set of rigid frames, and an assignment of rigid bodies to each frame.
+	The topology is a directed acyclic graph; here, every edge is directed away from the root.
+	The root of the tree is a unique node that represents a global reference frame.
+	Each node of the tree represents a rigid frame to which a rigid body is assigned.
+	Each edge corresponds to the rigid transformation (relative pose) between the end node and the base node of the edge; in the opposite direction, the transformation is inverted.
+	There is exactly one path through the tree between any two nodes, called a kinematic chain.
+	The transformation between any two rigid bodies is obtained by multiplying the transformations along the kinematic chain between the two rigid bodies.
+	Because all pairwise transformations are implicitly encoded within the edges of the tree, the tree represents the entire macromolecular structure.
+
+	In our current kinematic ensemble representation, the topology is fixed, and only the transformations of the edges can vary.
+	We construct a kinematic ensemble from a kinematic tree by replacing the transformation at each edge with a distribution of transformations.
+	These distributions give the relative transformation between two connected rigid bodies.
+	Unlike transformations in the kinematic tree, we cannot easily compute corresponding distributions of pairwise transformations between any two bodies in a kinematic ensemble.
+	To do so, we must assume that each edge's transformation distribution is conditionally independent of all other transformation distributions.
+	The distribution of the transformation between any two rigid bodies is then the convolution (\ie the distribution of the product of transformations sampled from the original distributions is the convolution of the two distributions; \cref{ensemble-inference-si}) of each of the distributions along the kinematic chain between the rigid bodies.
+
+	%% Convolutions of distributions
+
+	In general, densities of convolution distributions are computationally too expensive to compute, because they involve numerically computing one integral for each edge in the kinematic chain.
+	However, for a special class of density functions, we can use a generalization of the Fourier transform on the group of rigid transformations\supercite{millerApplicationsRepresentationTheory1964,chirikjianHarmonicAnalysisEngineers2016} to approximate the density of the convolution distribution using multiplication of Fourier transforms along the kinematic chain (\cref{ensemble-inference-si}).
+	While the generalized Fourier transform makes convolution feasible, the transform itself is expensive to compute\supercite{kyatkinAlgorithmsFastConvolutions2000}.
+	Thus it is preferable to select transformation distributions whose Fourier transforms are described analytically.
+
+	% A key caveat to this approach is that transforms are approximations of the corresponding distributions.
+	% Their accuracy degrades as the distributions become sharp; consequently, this approach is most appropriate for broad pairwise transformation distributions.
+
+	%% Choice of component distributions (focus on diffusion normal)
+	For the transformation distributions, we use here a diffusion normal distribution, written
+	$T \sim \diffnorm(\mu, \Sigma)$,
+	where $T$ is a random transformation.
+	Informally, $\diffnorm$ is the distribution resulting from driftless (thus, symmetric but not necessarily isotropic) diffusion of $T$ around a centroid transformation $\mu$ with a positive semidefinite diffusion matrix $\Sigma$.
+	For a narrow distribution, $\Sigma$ plays the role of a covariance matrix.
+	The distribution has several special cases, which we describe in \cref{ensemble-inference-si}.
+	Notably, if the variance of the orientation is zero, then $\diffnorm$ becomes a trivariate normal distribution of translations; it is a classical result that isotropic translational diffusion (\ie Brownian motion) produces a normal distribution) \supercite{einsteinInvestigationsTheoryBrownian1956}.
+	If the variance of the translational part is zero and the rotational part is isotropic with respect to the axis of rotation, then $\diffnorm$ becomes the Brownian rotation distribution \supercite{perrinEtudeMathematiqueMouvement1928}.
+	$\diffnorm$ is flexible enough to represent various transformation distributions, such as those resulting from primarily hinge, shear, or twist motions.
+	In the future, more complicated distributions could be expressed with weighted mixtures of diffusion normal distributions.
+	The diffusion normal distribution has been used to model conformational statistics of flexible polymers \supercite{chirikjianConformationalStatisticsStiff2000,chirikjianConformationalStatisticsMacromolecules2001}.
+	However, to our knowledge it has not been applied to kinematic tree representations of proteins or for data-driven modeling of protein structural ensembles.
+
+	%% mixtures
+
+	%% the kinematic ensemble representation
+
+	In summary, a kinematic ensemble is a distribution of kinematic trees and, consequently, of the positions and orientations of all rigid bodies represented by the tree.
+	For each edge, we compute the Fourier transform of the transformation distribution between the corresponding rigid bodies.
+	By integrating out non-contributing degrees of freedom, we can in principle simultaneously approximate distributions of distances between any two particles in two rigid bodies, rotations between any two orientations, and angles between any two directions within the ensemble;
+	for example, if a measurement only informs distances, the orientational and directional degrees of freedom are integrated out.
+	Likewise, if the measurement only informs angles, both the translational and most of the orientational degrees are freedom are integrated out.
+	These distributions can then be used to construct computationally efficient forward models for measured quantities of continuous ensembles.
+	The form of the integral is dependant on the measurement, and an analytic or approximate method must be derived for computing each measurement independently.
+	To illustrate the approach, we describe a corresponding forward model for NOE measurements (\cref{ensemble-inference-si}).
+
+	%% NOE kinematic ensemble forward model
+
+	%% statistical model/scoring function
+
+	We adopt a previously developed likelihood for computing NOE intensity from a distance between a pair of spins, subject to a lognormal noise model with a single error term $\sigma$ \supercite{riepingInferentialStructureDetermination2005}.
+	For a single measured intensity $d_i$ between two spin pairs and a single state, this likelihood is
+	$$\pi(d_i \mid \theta) = \frac{1}{\sqrt{2\pi} \sigma d_i} \exp\qty(-\frac{1}{2}\qty(\frac{\log d_i - \log I_i}{\sigma})^2).$$
+	$I_i$ is the single-state forward model $I_i = \gamma r_i^{-6}$, where $r_i$ is the distance between the two spin pairs in the current draw defined by $\theta$, and $\gamma$ is an unknown scaling factor that must be inferred.
+	This noise model approximates uncertainty originating from experimental noise, data processing, and the approximation of the forward model \supercite{riepingInferentialStructureDetermination2005}.
+	We maintain this noise model and modify the forward model to be an expectation (average) over the ensemble\supercite{brungerThreedimensionalStructureProteins1986,cloreApplicationMolecularDynamics1986,fletcherTreatmentNOEConstraints1996}:
+	$I_i = \gamma \expect{ r_i^{-6} }.$
+	In the limit that the ensemble is extremely narrow, this forward model converges to the single-state one.
+	Computing this expectation is the non-trivial step of modeling with the kinematic ensemble representation because the ensemble is continuous, and the expectation involves integration.
+	We describe how to efficiently numerically integrate this expectation over the ensemble in \cref{ensemble-inference-si}.
+	Also included in \cref{ensemble-inference-si} is a description of the prior distribution we use.
+
+	%% sampling
+	%\todo{elaborate on why MCMC generally and dynamic HMC specifically.}
+
+	Each variable is sampled by first transforming it to unconstrained real space, with the necessary modification to the scoring function to ensure the same posterior distribution is targeted (\cref{ensemble-inference-si}).
+	We use dynamic Hamiltonian Monte Carlo (HMC) \supercite{betancourtGeometricFoundationsHamiltonian2014,betancourtConceptualIntroductionHamiltonian2018}, a Markov Chain Monte Carlo (MCMC) method, to sample all parameters simultaneously.
+
+	%% ensemble analyses
+	% \todo{present tense throughout}
+	We analyze the posterior sample of ensembles $p(\theta \mid d,\iota)$ in three ways.
+	First, we consider the sampled variables that parameterize the ensemble.
+	They include sampling diagnostics as well as analyses of the ensemble of centroid structures around which the ensembles fluctuate.
+	Standard diagnostics, including the rank-normalized potential scale reduction factor ($\hat{R}$), effective sample size (ESS), energy Bayesian fraction of missing information (EBFMI), and divergence checks, are used to identify common causes of sampling bias.
+	$\hat{R}$ compares the between-chain and within-chain variance of each parameter for all pairs of MCMC chains to identify chains that have not yet converged \supercite{vehtariRanknormalizationFoldingLocalization2020}.
+	ESS estimates the effective number of independent samples in an autocorrelated MCMC chain.
+	EBFMI and divergence checks are HMC-specific diagnostics that informally identify heavy tails and high curvature in the posterior distribution, which prevent chains from converging to the target posterior distribution \supercite{betancourtDiagnosingSuboptimalCotangent2016,betancourtHamiltonianMonteCarlo2013}.
+
+	Second, we analyze the structural posterior $p(x \mid d,\iota)$.
+	In particular, we evaluate whether two independently sampled structural posteriors are similar and compute the sampling precision.
+	The sampling precision is defined as the smallest clustering threshold for which the resulting clusters of the pooled structural posteriors have proportional contributions from each individual structural posterior \supercite{viswanathAssessingExhaustivenessStochastic2017}.
+
+	Third, we assess the consistency of the inferred sample of ensembles with the data.
+	For each posterior draw of an ensemble, we simulate a noisy NOE intensity using the likelihood, which produces a sample of predicted NOE intensities from a distribution called the posterior predictive distribution \supercite{rubinBayesianlyJustifiableRelevant1984}.
+	We use the posterior predictive sample to confirm that the inferred ensembles and nuisance parameters are consistent with the experimental data upon which the posterior was conditioned;
+	we define experimental data as reproduced when all measured data are contained within the 90\% predictive interval computed from the posterior predictive sample.
+	We used approximate Leave-One-Out (LOO) cross-validation \supercite{vehtariPracticalBayesianModel2017,vehtariParetoSmoothedImportance2019} implemented in the package ArviZ \supercite{kumarArviZUnifiedLibrary2019} to assess the sensitivity of the posterior samples to each data point.
+
+	%\todo{in silico benchmark}
+
+	%% experimental benchmark
+
+	% \todo{
+	% 	1. pick a specific dataset
+	% 	2. where is NOE data in BMRB? Is there a better database?
+	% }
+
+	We used the kinematic ensemble method to fit NOESY intensities measured for calmodulin (CaM), which has two approximately rigid domains joined by a partially flexible linker \supercite{barbatoBackboneDynamicsCalmodulin1992,fragaiFourDimensionalProteinStructures2006}.
+	NOE intensities and assignments of spin pairs were downloaded from the Biological Magnetic Resonance Data Bank.% (BMRB ID: XXX).
+	Rigid bodies were defined using DynDom \supercite{leeDynDomDatabaseProtein2003,qiComprehensiveNonredundantDatabase2005}.% (DynDom ID: XXX).
+	Data corresponding to intra-rigid body spin pairs were discarded.
+	Several types of kinematic ensemble models were fit to the data.
+	First, we fit two types of ensemble models with only translational motion, where the distribution of inter-atomic vectors is then a trivariate normal distribution.
+	These were divided into two classes: one with radially asymmetric (ellipsoidal) distributions and one with radially symmetric (spherical) distributions.
+	Second, we fit ensemble models with both translational and orientational motion.
+	Again, we fit two variants: one where translations and orientations co-vary and one where they vary independently and are rotationally symmetric.
+	We validated the ensembles against residual dipolar coupling (RDC) measurements by simulating ensemble RDCs from each ensemble, thus producing a predictive distribution of RDCs, and comparing them with the observed RDCs using the $Q$-factor.
+
+	% \todo{elaborate on how we compare with previously published model}
+
+	% \todo{can we show that it delivers in all the cases we developed it for?}
+
+	%WE NEED AN INSILICO BENCHMARK. ALSO AN ORTHOGONAL DATASET TO VALIDATE AGAINST, ONE THAT IDEALLY UNAMBIGUOUSLY INDICATES ENSEMBLE PROPERTIES UNDER SIMILAR CONDITIONS%
+
+	%\section{Results}\label{results}
+
+	\section{Discussion}\label{discussion}
+
+	%% significance, benefits, and limitations of kinematic ensemble Approach
+	%%   - significant because it addresses a regime not currently covered by existing methods
+	%%   - moves toward more complicated continuous ensembles that can be represented with fewer degrees of freedom than large multi-state ensembles
+	%%   - still permits quantification of uncertainty
+	%%   - limitations
+	%% how does it to relate to previous methods (4 stages; accuracy, precision, applicability, efficiency)
+
+	% We introduced the kinematic ensemble representation of systems consisting of rigid bodies for the purpose of efficient scoring function evaluation and structural sampling.
+
+
+	We introduced the kinematic ensemble representation of systems consisting of rigid bodies.
+	We now discuss
+	1) the advantages of the kinematic ensemble approach,
+	2) the disadvantages of the kinematic ensemble approach,
+	3) comparison with other approaches, and % 4) the illustration of the kinematic ensemble representation by its application to the NMR-based modeling of calmodulin, and
+	4) future directions.
+
+	% advantages
+
+	The kinematic ensemble representation is a superior alternative to discrete multi-state representations for certain systems, types of data, and types of analyses.
+	Systems for which a kinematic ensemble is preferable include those where previous analyses indicate that the system is comprised of approximately rigid bodies, and the subject of the analysis is the relative positions and motion between the rigid bodies.
+	Because the kinematic ensemble is a continuous distribution, it also represents rare states within the tails of the distribution.
+	Hence, the kinematic ensemble approach may be more appropriate when using data such as NOE intensity, FRET efficiency, second-harmonic generation, and two-photon fluorescence \supercite{clancyAngularMappingProtein2019}, where the ensemble average is highly sensitive to such rare states.
+	The representation also positions us to address how to deconvolve the contributions of uncertainty and heterogeneity to the ensemble, in that it fits many alternative ensembles, each of which satisfies the used information equally well.
+	The implementation of the method is standalone.
+	It is included in the Integrative Modeling Platform (IMP) \supercite{russelPuttingPiecesTogether2012}, but the representation and forward model can also be used within other structural modeling software or probabilistic programming languages like Turing \supercite{geTuringLanguageFlexible2018} or PyMC3 \supercite{salvatierProbabilisticProgrammingPython2016}, where inference can be run on a desktop computer.
+
+	%% disadvantages
+
+	The kinematic ensemble approach is not appropriate for every analysis.
+	Many systems cannot currently be well represented with the kinematic ensemble representation.
+	The method requires that the system be well partitioned into rigid bodies for which prior structural models are available.
+	Moreover, it requires that there are no long-range interactions between rigid bodies; the motion between any two rigid bodies must be independent of the motions between any other two bodies.
+	Correspondingly, it cannot represent correlated motions.
+	Hence, the representation can not for example currently be used to model a flexible loop by partitioning the backbone into rigid bodies, as loop closure would not then be guaranteed.
+	The forward models for the kinematic ensemble representation are more complicated than for a multi-state representation and in general require numerical integration.
+	While we show in \cref{ensemble-inference-si} how we can efficiently compute the ensemble NOE forward model using properties of the generalized Fourier basis functions, this approach may become infeasible if the ensemble is in fact very narrow.
+	In such cases a multi-state representation is efficient and preferable.
+
+	The ensemble averaged forward model used here neglects the effect of kinetics on observed NOEs.
+	Likewise, so does the technique for simulating RDCs from the ensemble.
+	Recent work has indicated that NOEs in particular contain a great deal of high resolution structural information not utilized by structural characterization techniques that neglect kinetics\supercite{smithEnhancingNMRDerived2020}.
+	Thus, neglecting kinetics further limits the achievable accuracy and precision of the inferred kinematic ensembles.
+
+	% comparison
+
+	In the introduction, we classified ensemble modeling methods by the type of output.
+	While our approach produces a distribution of ensembles, we could also use the kinematic ensemble representation to produce a single best ensemble, for example by computing a maximum a posteriori (MAP) estimate.
+	\cite{bonomiPrinciplesProteinStructural2017} proposes a useful alternative classification of ensemble methods by whether a method produces a large ensemble of structures by minimally perturbing an initial ensemble to ensure consistency with data ("maximum entropy") or whether it produces the smallest ensemble that is consistent with the data ("maximum parsimony").
+	Because our representation is continuous, the kinematic ensemble approach in a sense falls in the former category.
+	However, the width of the ensemble is determined by sampled variables, and the sampled ensembles may be narrow or broad, depending on the available information.
+	Our approach therefore is a step toward bridging the gap between the two categories of ensemble modeling methods.
+
+	%% ways to generalize the approach
+	%%  - sample topology and rigid body identities as well
+	%%  - develop additional scoring function terms (set up SHG paper)
+	%%  - generalize to allow joint distributions, which would permit correlations of non-connected rigid bodies (equivalent to allowing cyclic topologies)
+	%%  - explore alternative flexible representations for computing expectations (there's a class of neural nets I read about against which expectations can be computed)
+
+	The kinematic ensemble approach may be extended to cover more use cases in several ways.
+	First, we can develop more forward models for the kinematic ensemble, thus enabling multiple orthogonal data sources to inform distance, angular, and orientational degrees of freedom of the same ensemble.
+	Second, we can extend the representation by releasing several constraints.
+	The topology of the tree and the partitioning of regions of the macromolecule into rigid bodies can be sampled, enabling inference of the key interactions between rigid bodies and inference of the rigid body constraints themselves.
+	Moreover, in principle the tree could be represented more generally as a cyclic graph, where the pose of a rigid body is the joint distribution of the alternative chains between it and the root node.
+	This would enable modeling of correlations between rigid bodies not connected in the topology and open up the possibility for example of representing heterogeneity in loops.
+	Third, further work will be necessary to explore if and how the kinematic ensemble representation can be augmented to represent kinetics at multiple timescales.
+	%\todo{talk about approximating ensemble using other functions, e.g. using non equally spaced basis functions or using a neural network against which we can compute expectations}
+
+	\clearpage
+	\printbibliography[heading=subbibintoc]
+\end{refsection}
+
+\end{document}

@@ -1,5 +1,9 @@
 # Settings
-$xdvipdfmx = "xdvipdfmx -z 6 -o %D %O %S";
+$pdflatex = 'lualatex -file-line-error %O -shell-escape %S';
+$pdf_mode = 1;
+$dvi_mode = 0;
+$postscript_mode = 0;
+$clean_ext = "synctex.gz synctex.gz(busy) run.xml tex.bak bbl bcf fdb_latexmk run tdo %R-blx.bib";
 
 ###############################
 # Post processing of pdf file #
@@ -29,11 +33,22 @@ END {
 ##############
 # Glossaries #
 ##############
-add_cus_dep( 'glo', 'gls', 0, 'glo2gls' );
-add_cus_dep( 'acn', 'acr', 0, 'glo2gls');  # from Overleaf v1
-sub glo2gls {
-    system("makeglossaries $_[0]");
+# https://tex.stackexchange.com/a/44316
+add_cus_dep('glo', 'gls', 0, 'run_makeglossaries');
+add_cus_dep('acn', 'acr', 0, 'run_makeglossaries');
+
+sub run_makeglossaries {
+  if ( $silent ) {
+    system "makeglossaries -q '$_[0]'";
+  }
+  else {
+    system "makeglossaries '$_[0]'";
+  };
 }
+
+push @generated_exts, 'glo', 'gls', 'glg';
+push @generated_exts, 'acn', 'acr', 'alg';
+$clean_ext .= ' %R.ist %R.xdy';
 
 #############
 # makeindex #

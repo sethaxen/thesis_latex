@@ -1,0 +1,14 @@
+{
+    "latex-workshop.latex.rootFile.useSubFile": true,
+    "latex-workshop.latex.rootFile.doNotPrompt": true,
+    "latex-workshop.chktex.enabled": true,
+    "latex-workshop.latex.autoBuild.run": "onFileChange",
+    "latex-workshop.synctex.afterBuild.enabled": true,
+    "latex-workshop.latexindent.args": [
+        "-c",
+        "%DIR%/",
+        "%TMPFILE%",
+        "-y=verbatimEnvironments:juliacode:1",
+    ],
+    "editor.formatOnSave": true,
+}

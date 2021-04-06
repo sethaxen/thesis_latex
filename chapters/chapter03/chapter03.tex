@@ -1,0 +1,259 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Inferring ensembles of macromolecular structures using second-harmonic generation and two-photon fluorescence}
+\label{shg-tpf}
+
+\begin{refsection}
+
+	\section{Abstract}
+
+	A number of experimental and computational approaches can determine a conformational change of a structure in response to a perturbation.
+	However, many of these techniques suffer from limitations on the size of the system, operate under non-physiological conditions, are difficult to perform, or are low-throughput.
+	%(A promising new technique uses the nonlinear optic phenomena Second Harmonic Generation (SHG) and Two-Photon Fluorescence (TPF) in a highly sensitive, high-throughput assay for conformational changes in proteins; these data inform relative orientations of structural components in ensembles of multiple states under nearly native conditions.)
+	In the recently developed, high-throughput angular mapping of protein structure (AMPS) technique, second-harmonic generation (SHG) and two-photon fluorescence (TPF) measurements are used together to inform orientational components of structural ensembles of proteins under relatively native conditions.
+	Here, we develop a forward model for simulating SHG and TPF data from the kinematic ensemble representation, which can be used in a Bayesian inference workflow, potentially in combination with other sources of information.
+	The result is an extremely efficient technique for simultaneously inferring macromolecular ensembles with rotational degrees of freedom.
+	% We then apply the kinematic ensemble approach for inferring macromolecular ensembles using second-harmonic generation (SHG) and two-photon fluorescence (TPF) measurements, which inform relative orientations of structural components in molecular ensembles under nearly native conditions.
+	%We benchmark the technique using simulated data for XXX systems and experimentally determined data for XXX systems. For example, we estimate the achievable accuracy and precision of models inferred using SHG and TPF data by varying the relative density of simulated data and degrees of freedom of modeled systems. Finally, future experiments and computational advances to improve accuracy and precision are proposed. The proposed modeling method is in principle applicable to many different protein systems and is available through the open-source Integrative Modeling Platform (IMP) software package.
+
+	\section{Introduction}
+
+	% introduce problem, need for SHG/TPF
+	% Every ensemble-informing type of data is subject to certain limitations.
+	% In particular, experimental techniques often perturb or constrain the ensemble, such as in X-ray crystallography, or are low-throughput.
+	% techniques for sensitively assaying ensemble
+	% set up shg
+
+	Polarized second-harmonic generation (SHG) and two-photon fluorescence (TPF) are nonlinear optical phenomena that are highly sensitive to the orientational distribution of a molecular probe.
+	Both techniques have been previously used to fit the mean polar angle $\theta_0$ between the transition dipole moment of a small molecule probe interacting with some surface and the normal to that surface\supercite{heinzDeterminationMolecularOrientation1983,simpsonSHGMagicAngle1999,simpsonMolecularOrientationAngular2000,yamaguchiPhysisorptionGivesNarrower2010,raoMolecularOrientationalDistribution2011,reeveProbingOrientationalDistribution2012,chenTheoryTwophotonInduced1993}.
+	Even in such simple experimental set-ups, due to heterogeneity in the orientation of the probe relative to the surface, it is generally not possible to reproduce observed SHG and/or TPF data by fitting a single orientation (\ie a single state).
+	Rather, it is standard to fit a polar angular distribution with both a mean angle $\theta_0$ and some notion of width.
+	Hence, SHG and TPF are generally used to fit relatively simple molecular ensemble models where the only structural degree of freedom is the polar angle $\theta$.
+
+	Recently, SHG has been developed for a highly sensitive, high throughput assay for conformational change in proteins\supercite{moreeProteinConformationalChanges2015}.
+	Subsequently, SHG and TPF were combined for angular mapping of protein structure (AMPS) \supercite{clancyAngularMappingProtein2019}.
+	In the AMPS set-up, many copies of a protein with a site-specifically bound small molecule probe are tethered to a glass-supported lipid bilayer.
+	The probe both is SHG-active and undergoes two-photon excitation.
+	Through its interaction with the surface-tethered protein, the copies of the probe effectively form a monolayer above the glass surface.
+	Upon excitation with a $p$- or $s$-polarized incident laser beam, a second-harmonic signal and a two-photon fluorescent signal are measured at a polarization $p$.
+	Assuming a family of distributions for the polar density, the resulting four measured intensities can be used to fit the mean angle $\theta_0$ and a width parameter $\sigma$.
+	By perturbing the protein using, for example, a ligand, the change in estimated mean angle and width can be used to reason about which regions of the protein underwent a conformational change and which regions may have been stabilized or destabilized.
+	This approach enables discrimination between known alternative mean structures.
+
+	Because the AMPS experimental technique is high-throughput, minimally perturbs the protein, and is highly sensitive to the underlying structural ensemble, the data it produces is attractive for ensemble inference.
+	The polar distribution is a single-dimensional projective view of the underlying three-dimensional orientational distribution function (ODF).
+	In principle, the ODF of the probe relative to the surface is dependent on the heterogenity of the protein-surface, protein-protein, and probe-protein structures.
+	To infer the protein structural ensemble, it is then necessary to have a representation of the variability of these degrees of freedom that permits them to be combined to form the corresponding ODF of the probe.
+
+	Here, we adapt the kinematic ensemble approach developed in \cref{ensemble-inference} for inferring orientational components of macromolecular ensembles using SHG and TPF.
+	We develop an efficient forward model that exactly simulates SHG and TPF data from the continuous ensemble representation and benchmark the technique for inferring orientational ensembles.
+
+	% The protein-surface and probe-protein ODFs are in general nuisance parameters.
+	% To infer
+
+	% For such a structural ensemble to be meaningful, it must have at least one rotational degree of freedom.
+
+
+	% For SHG, this relationship was explored in \cite{dickIrreducibleTensorAnalysis1985}.
+
+
+
+	% The result are
+	% for a total of four intensities measured almost simultaneously on the same sample.
+	% These measured intensities inform the orientational ensemble of the transition dipole moment of the probe relative to the normal vector to the surface, which in principle includes all protein-surface, protein-protein, and probe-protein rotational degrees of freedom.
+
+	% % how has previous work used it?
+	% SHG has previously been used to fit parameters of the distribution of the angle between the dipole and the surface normal, called the polar angle.
+	% For example, \cite{} used SHG \ldots \todo{fill in}.
+	% \cite{clancyAngularMappingProtein2019} combined SHG and TPF to inform the same underlying polar distribution.
+	% By assuming a specific family of distributions, they estimated a single best "mean" angle $\theta_0$ and "width" $\sigma$ that were able to reproduce a given set of four measured intensities.
+	% By perturbing the protein using, for example, a ligand, the change in estimated mean angle and width can be used to reason about which regions of the protein underwent a conformational change and which regions may have been stabilized or destabilized.
+	% This approach enables discrimination between known potential conformations; however, has not yet been applied for inferring the underlying structural ensemble.
+
+	% Previous uses of SHG alone and in combination with TPF have focused on using the data to fit parameters of a polar angular distribution, that is, the distribution of the angle between the molecular $z$-axis (\ie the transition dipole moment of the probe) and the laboratory $z$-axis (\ie the surface normal).
+	% \cite{REF} used this approach for a layer of probes interacting directly with a glass surface, where the parameters of the polar distribution inform the direct interaction of the probe with the surface.
+	% \cite{REF} used it for a bulk measurement where many copies of a protein with covalently bound probe were tethered to a surface.
+	% In this set-up, the probes approximately behave as a monolayer, where now the parameters of the polar distribution inform the indirect interaction of the probe with the surface, mediated by the structure of the protein.
+	% The resulting data in principle inform all rotational degrees of freedom between the probe and the surface normal, including protein-surface, protein-probe, and protein-protein interactions.
+	% Because measurement is a bulk one, it actually informs the rotational components of a structural ensemble.
+	% \cite{REF} used SHG and TPF to simultaneously inform the same polar distribution; upon perturbation, they observed the changes in the fit parameters and used them to infer conformational changes in the protein.
+
+	% problem of fitting distribution
+	% Fitting a polar distribution to either SHG or TPF data is a fundamentally under-determined problem.
+	% In the AMPS set-up, a noise-free experiment gives two knowns, which can be written as the SHG and TPF ratios:
+	% \begin{equation}
+	% \end{equation}
+	% These two values are insufficient to uniquely determine the underlying distribution.
+	% Therefore, an integrative approach is required, where the measurements must be complemented with other data or prior information.
+	% The most widely used prior information is the assumption of a two-parameter, unimodal family of distributions.
+	% The combination of SHG and TPF is itself an integrative approach.
+
+	% It is attractive to use SHG and TPF data to infer structural ensembles for several reasons.
+	% First, the signals are highly sensitive to the ensemble, including to perturbations to the ensemble and to rare states.
+	% Second, the data are collected under near-native conditions; the measurements can be collected at room temperature, and the only structural perturbations come from interaction with the surface via a tether and from interaction with a probe covalently linked at one or more sites.
+	% Third, the data collection is both fast and high-throughput.
+
+	% The latter point is important.
+	% Because a single pair of SHG and TPF measurements only inform two parameters of a polar distribution, this is insufficient to infer much about the individual structural degrees of freedom of the protein, because the polar distribution is some combination of the joint distribution of all rotational degrees of freedom projected onto a single dimension.
+	% Consider that a single NOE intensity likewise informs the projection of a high dimensional positional distribution onto a single dimension.
+	% Given enough data informing the individual distance distributions, one can infer parameters of the the more interesting positional distribution.
+	% Similarly, by varying the location of the probe in the protein and the relative orientation of the protein with the surface, each measurement informs a different projection through the high-dimensional structural ensemble.
+
+	% how has it been used in structural biology? (qualitatively)
+
+	% tomography idea
+
+	% to use it to infer ensembles, we need a way to represent the combination of different DOFs and we need a way for both measurements and many data points to inform same DOFs
+
+	% downsides of previous approaches
+	% discuss problems with wrapped normal approach and spherical approach
+
+	% summary of contributions
+
+	% Here we discuss the information present in data collected under the AMPS set-up.
+	% We propose an alternative family of distributions, the polar normal distribution, from which we can exactly simulate SHG and TPF data in closed-form.
+	% We also construct a forward model for SHG and TPF data from the kinematic ensemble representation, thus enabling Bayesian inference of degrees of freedom of a conformational ensemble from SHG and TPF data.
+	% We discuss efficient implementation of the technique and show that under certain assumptions, the kinematic ensemble approach reduces to the polar normal distribution and can be computed highly efficiently.
+	% We describe a proposed synthetic and experimental benchmark for validating the approach.
+
+	\section{Approach}
+
+	Here, we outline the modifications for SHG and TPF, while the additional derivations are given in \cref{shg-tpf-si}.
+
+	Given the polar angle (\ie the angle between the dipole moment and the surface normal) and its density function $\pi(\theta)$ with respect to the measure $\sin\theta \dd{\theta}$, \cite{clancyAngularMappingProtein2019} relates the the $p$-polarized SHG intensities to $\pi(\theta)$ as
+	\begin{equation} \label{shg_fwd_model}
+		I_{ppp} = a f_z^4 \expect{\cos^3 \theta}{\pi}^2 \qquad
+		I_{pss} = \frac{1}{4} a f_y^4 \expect{\sin^2 \theta \cos \theta}{\pi}^2,
+	\end{equation}
+	where $f_z$ and $f_y$ are Fresnel coefficients that describe how the electric field is modified by the glass/water interface.
+	The ratio $r_f = \frac{f_z}{f_y}$ can generally be measured, while $a$ is an unknown positive constant factor whose magnitude is related to the power of the incident laser and the number density of probes on the surface.
+	$\expect{f}{\pi}$ denotes the expectation of $f(\theta)$ over $\pi(\theta)$:
+	$$\expect{f}{\pi} = \int_0^\pi f(\theta) \pi(\theta) \sin\theta \dd\theta.$$
+	The intensity $I_{ppp}$ corresponds to the polarization of the excitation laser being pure $p$, while $I_{pss}$ corresponds to the polarization of the excitation laser being pure $s$.
+
+	% \todo{explain assumptions}
+	Similarly, measured TPF intensities are related to $\pi(\theta)$ as
+	\begin{equation} \label{tpf_fwd_model}
+		F_{pp} = b f_z^4 \expect{\cos^4 \theta \sin^2 \theta}{\pi} \qquad
+		F_{ss} = \frac{3}{8} b f_y^4 \expect{\sin^6 \theta}{\pi},
+	\end{equation}
+	where $b$ is an unknown real positive constant, and $f_y$ and $f_z$ are the same Fresnel factors that appeared in \cref{shg_fwd_model}.
+
+	The expressions for the measurements contain constants that are generally non-trivial to measure and vary between experiments.
+	Therefore, in a noiseless SHG/TPF dataset, only the ratios of the two SHG and two TPF intensities can be related to the ensemble:
+	\begin{equation}\label{shg_tpf_ratios}
+		R_{\mathrm{SHG}} = 4 r_f^4 \qty(\frac{\expect{\cos^3\theta}{\pi}}{\expect{\sin^2\theta \cos\theta}{\pi}})^2 \qquad
+		R_{\mathrm{TPF}} = \frac{8}{3} r_f^4 \frac{\expect{\cos^4\theta \sin^2\theta}{\pi}}{\expect{\sin^6\theta}{\pi}}.
+	\end{equation}
+	Hence, in the absence of experimental error, the four measurements give us a system of two equations informing the underlying ensemble.
+
+	Both the laboratory frame and the molecular frame are associated with rigid bodies.
+	The laboratory frame essentially represents the surface and its normal, so that the surface normal is the $z$-axis of its corresponding rigid body.
+	The molecular frame essentially represents the transition dipole moment of the probe, so that the dipole moment is aligned with the $z$-axis of its rigid body.
+	In the kinematic ensemble representation, the kinematic chain is a path connecting these two rigid bodies, where the nodes of the chain are rigid bodies in the protein and the edges are distributions of rotations.
+	The ODF $\pi(R)$ of the combined rotation $R$ from the laboratory frame to the molecular frame can then be explicitly computed as the distribution produced by the convolution of the rotational distributions along the chain.
+	The convolution is efficiently computed using the generalized Fourier transform on $\SO{3}$, the group of rotation matrices in $\bbR^3$.
+	Previously, \cite{dickIrreducibleTensorAnalysis1985} used the basis functions of this Fourier transform, the Wigner $D$-matrices\supercite{wignerThreeDimensionalPureRotation1959,varshalovichQuantumTheoryAngular1988}, to approximate the ODF for $\SO{3}$; however, that work did not use the Fourier transform for convolution.
+	The ODF is a subject of interest in texture analysis, where similar techniques to those we use here have been employed \supercite{schaebenSphericalHarmonicsTexture2003}.
+
+	Given the size $2\ell + 1 \times 2\ell + 1$ Fourier coefficient matrix of $\pi(R)$, written $\coef{\pi}^\ell$, where $\ell \ge 0$ is an integer index, not a power, the density of the polar distribution with respect to the measure $\sin\theta \dd\theta$ is given in \cref{polar_dens_ftrans} as
+	\begin{equation}\label{polar_dens_ftrans_main}
+		\pi(\theta) = \frac{1}{2} \sum_{\ell=0}^\infty (2\ell+1) a_\ell P_\ell(\cos\theta) \qquad a_\ell = \coef{\pi}^\ell_{00}
+	\end{equation}
+	where $P_\ell(\cdot)$ is the Legendre polynomial of the first kind of degree $\ell$ (\cite[Section 18.3]{NIST:DLMF}), $a_\ell$ is the degree $\ell$ expansion coefficient of this Fourier-Legendre series, and $\coef{\pi}^\ell_{00}$ is a single element of the matrix $\coef{\pi}^\ell$.
+	The Legendre polynomials can be efficiently computed using the forward recurrence relations (\cite[Section 18.9i]{NIST:DLMF})
+	\begin{align*}
+		P_0(x) = 1\qquad P_1(x) = x\qquad P_\ell(x) = \frac{1}{\ell} \bigg((2 \ell - 1) x P_{\ell - 1}(x) - (\ell - 1) P_{\ell - 2}(x)\bigg).
+	\end{align*}
+	\cite{dickIrreducibleTensorAnalysis1985,simpsonSHGMagicAngle1999} observed that if a polar density is expanded in a Fourier-Legendre series, then the expectations in the SHG forward model can be computed exactly from the two coefficients $a_1$ and $a_3$.
+	\cite{chenTheoryTwophotonInduced1993} found that a similar TPF forward model could likewise be computed with only a few coefficients.
+	We show in \cref{shg-tpf-si} that this property holds for the AMPS TPF forward model.
+	We can thus exactly compute the expectations as
+	\begin{align}
+		\begin{split}
+			\expect{\cos^3\theta}{\pi}              & = \frac{3}{5} a_1 + \frac{2}{5} a_3                                            \\
+			\expect{\cos\theta \sin^2\theta}{\pi}   & = \frac{2}{5} a_1 - \frac{2}{5} a_3                                           \\
+			\expect{\cos^4\theta \sin^2\theta}{\pi} & = \frac{2}{35} + \frac{2}{21} a_2 - \frac{32}{385} a_4 - \frac{16}{231} a_6  \\
+			\expect{\sin^6\theta}{\pi}              & = \frac{16}{35} - \frac{16}{21} a_2 + \frac{144}{385} a_4 - \frac{16}{231} a_6
+		\end{split}
+	\end{align}
+
+	As in \cref{ensemble-inference}, we use diffusion normal distributions to represent rotation distributions.
+	The diffusion normal distribution on $\SO{3}$ is parameterized by a centroid rotation $\mu$, analogous to a mean, and a $3 \times 3$ positive semi-definite diffusion matrix $\Sigma$, analogous to a covariance matrix.
+	$\Sigma$ permits the representation of anisotropic rotational distributions such as a hinge motion between two rigid bodies.
+
+	In the special case where $\Sigma$ is a scalar matrix, so that $\Sigma=\sigma^2 I_3$ for $\sigma > 0$ and $I_3$ the $3 \times 3$ identity matrix, the resulting isotropic rotational distribution is called the Brownian rotation distribution $\mathrm{BR}(\mu, \sigma^2)$ \supercite{perrinEtudeMathematiqueMouvement1928,nikolayevNormalDistributionRotation1997}.
+	Brownian rotations are closed under convolution; that is, the convolution of Brownian rotations is another Brownian rotation:
+	\begin{equation}
+		\mathrm{BR}(\mu_1, \sigma_1^2) \convwith \ldots \convwith \mathrm{BR}(\mu_n, \sigma_n^2) = \mathrm{BR}(\mu, \sigma^2) \qquad \mu = \mu_1 \mu_2 \ldots \mu_n\qquad \sigma^2 = \sum_{i=1}^n \sigma_i^2
+	\end{equation}
+	If all distributions along a chain are Brownian rotations, then so is the combined distribution of the rotation from the laboratory to molecular frame.
+	In this case, the Fourier-Legendre coefficient in \cref{polar_dens_ftrans_main} is
+	\begin{equation}
+		a_\ell = \coef{\pi}^\ell_{00} = e^{-\frac{1}{2} \ell(\ell + 1) \sigma^2} P_\ell(\cos\theta_0),
+	\end{equation}
+	where $\theta_0$ is the polar angle of the combined rotation $\mu$ (\ie the angle between the surface normal and the dipole rotated by $\mu$), and $\sigma$ is the combined diffusion coefficient.
+	With the shorthand $p_\ell = P_\ell(\cos\theta_0)$, we can then write out the corresponding SHG and TPF expectations in closed-form:
+	\begin{align}
+		\begin{split}
+			\expect{\cos^3\theta}{\mathrm{BR}}
+			&= \frac{1}{5} e^{-\sigma^2} \qty(3 p_1 + e^{-5 \sigma^2} p_3)
+			= \frac{1}{5} e^{-\sigma^2} \cos\theta_0 \qty(3 + e^{-5\sigma^2} \qty(5 \cos^2\theta_0 - 3))\\
+			\expect{\cos\theta \sin^2\theta}{\mathrm{BR}}
+			&= \frac{2}{5} e^{-\sigma^2} \qty(p_1 - e^{-5 \sigma^2} p_3)
+			= \frac{1}{5} e^{-\sigma^2} \cos\theta_0 \qty(2 - e^{-5\sigma^2} \qty(5 \cos^2\theta_0 - 3))\\
+			\expect{\cos^4\theta \sin^2\theta}{\mathrm{BR}}
+			&= \frac{2}{7} \qty(\frac{1}{5} + \frac{1}{3} e^{-3 \sigma^2} p_{2} - \frac{8}{11} \qty(\frac{2}{5} e^{-10 \sigma^2} p_{4} + \frac{1}{3} e^{-21 \sigma^2} p_{6}))\\
+			\expect{\sin^6\theta}{\mathrm{BR}}
+			&= \frac{16}{7} \qty(\frac{1}{5} - \frac{1}{3} e^{-3 \sigma^2} p_{2} + \frac{1}{11} \qty(\frac{9}{5} e^{-10 \sigma^2} p_{4} - \frac{1}{3} e^{-21 \sigma^2} p_{6}))
+		\end{split}
+	\end{align}
+	These expressions are also useful for simply fitting a polar angle distribution.
+	While the Brownian rotation distribution has been used in texture analysis to represent an ODF, despite the simplicity and efficiency of the resulting expressions and the interpretability of the parameters, we know of no studies where a Brownian rotation distribution has been fit to SHG and TPF data.
+
+	% rotamer library development for PyMPO
+
+	We use the above forward models in a Bayesian inference workflow, described in \cref{ensemble-inference}.
+	For all analyses, we initially infer ensembles using only isotropic Brownian rotation distributions, where all operations are then simple scalar ones, and the scoring function for some systems takes only microseconds to execute.
+	If data cannot be sufficiently reproduced using Brownian rotation distributions, then we increase the complexity of the representation by using dense diffusion matrices $\Sigma$.
+	The largest Fourier coefficient matrix needed for TPF is $\coef{\pi}^6$, which is a $13 \times 13$ matrix.
+	Because this is still quite small, all operations needed to evaluate the forward models even for a dense $\Sigma$ can be computed very efficiently.
+
+	% synthetic benchmark
+	% (single body on surface), compare with in silico predictions
+	% two rigid bodies
+	% multiple orientations on surface
+
+	% experimental benchmark
+	% principles (check primer or another of Andrej's papers)
+	% independent data
+
+	We selected 5 monotopic proteins, proteins that bind directly to the membrane, with known orientations on the membrane.
+	Sites for labeling were manually selected to maximize the diversity in orientations of resultant dipoles independent of knowledge of the surface orientation.
+	SHG and TPF measurements were simulated using for each labeled site and the target orientation using the forward model.
+	Noise typically observed in actual SHG and TPF data was added to the simulated measurements.
+	Such a synthetic dataset was computed for each labeled site varying the number of labeled sites from 0 to 20 and varying the representation of the probe.
+	Considered probe representations were a single dominant probe dipole orientation, three equally dominant dipole orientations with concentrations corresponding to $\sigma$ values of of 0\textdegree, 5\textdegree, 15\textdegree, and 30\textdegree, and a rotamer library for the probe PyMPO maleimide\supercite{salafskySHGlabelsDetectionMolecules2001}.
+	An additional dataset/representation combination approximated an error-prone rotameric representation of the probe and consisted of the three-state dipole representation with populations of 60\%, 30\%, and 10\%, where the populations were shuffled when fitting to the data.
+	For each dataset and protein, the protein orientation with respect to the surface was modeled using the above method, resulting in a sample of ensembles following the posterior distribution.
+	The accuracy of the posterior was evaluated using the minimum azimuthal angle of rotation needed to align the modeled protein-surface orientation to the target orientation, averaged across all ensemble models.
+	The ensemble precision was similarly evaluated by computing the minimum pairwise azimuthal angle needed to align any two modeled protein-surface orientations, averaged across all ensemble modeled pairs.
+	We repeated this synthetic benchmark for toy systems of 2, 3, and 4 rigid bodies.
+
+	% \todo{experimental benchmark}
+
+	% \subsection{Synthetic Benchmark for Modeling a Rigid Body Change}
+
+	% \section{Discussion} ?
+
+	% benefits of the approach
+
+	% future directions?
+
+	\clearpage
+	\printbibliography[heading=subbibintoc]
+\end{refsection}
+
+\end{document}

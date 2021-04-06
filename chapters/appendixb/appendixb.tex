@@ -1,0 +1,221 @@
+\documentclass[../../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Supplementary information for Chapter 3}
+\label{shg-tpf-si}
+
+\begin{refsection}
+
+	\section{Computing the SHG and TPF expectations}
+
+	As shown in \cref{polar_dens_ftrans}, the polar density in terms of the $\SE{3}$ Fourier transform is
+	$$\pi(\theta) = \frac{1}{2} \sum_{\ell=0}^\infty (2\ell+1) \coef{\pi}^0_{\ell,0,\ell,0}(0) P_\ell(\cos\theta),$$
+	which is the Fourier-Legendre series of $\pi(\theta)$.
+	For notational simplicity, we will in what follows use the Fourier-Legendre coefficients:
+	$$\pi(\theta) = \frac{1}{2} \sum_{\ell=0}^\infty (2\ell+1) a_\ell P_\ell(\cos\theta), \quad a_\ell = \int_0^\pi \pi(\theta) P_\ell(\cos\theta) \sin\theta \dd\theta.$$
+	For a normalized PDF, $a_0 = 1$.
+
+	The expectation of a function $f(\theta)$ can be written entirely in terms of $P_\ell(\cos\theta)$, the Legendre polynomial of degree $\ell$:
+	$$\expect{f}{\pi} = \int_0^\pi f(\theta) \pi(\theta) \sin\theta \dd\theta = \frac{1}{2} \sum_{\ell=0}^\infty (2\ell+1) a_\ell \int_0^\pi f(\theta) P_\ell(\cos\theta) \sin\theta \dd\theta.$$
+	Thus the approach for computing the expectation is dependent only on the form of $f$ and not on the form of $\pi(\theta)$.
+	It is more convenient to work with the Legendre polynomials by a change of variables $x = \cos\theta$, so that $\theta = \cos[-1](x)$ and $\sin\theta \dd\theta = \dd x$.
+	By an abuse of notation, we will write $f(x) \equiv f(\theta)$, when $x=\cos\theta$.
+	The expectation is then
+	$$\expect{f}{\pi} = \frac{1}{2} \sum_{\ell=0}^\infty (2\ell+1) a_\ell \int_{-1}^1 f(\cos[-1](x)) P_\ell(x) \dd x.$$
+
+	The four functions of which we need to compute expectations are in terms of both $\theta$ and $x$
+	\begin{align*}
+		f_1(\theta) & = \cos^3 \theta,             &  & f_1(x) = x^3                      \\
+		f_2(\theta) & = \sin^2\theta \cos\theta,   &  & f_2(x) = x - x^3                  \\
+		f_3(\theta) & = \cos^4\theta \sin^2\theta, &  & f_3(x) = x^4 - x^6                \\
+		f_4(\theta) & = \sin^6\theta,              &  & f_4(x) = 1 - 3 x^2 + 3 x^4 - x^6.
+	\end{align*}
+
+	That is, the functions are low order polynomials of $x$.
+	We can unify these functions as
+	$$f(x) = \sum_{n = 0}^\infty b_n x^n,$$
+	and the expectation is then written
+	$$\expect{f}{\pi} = \frac{1}{2} \sum_{\ell=0}^\infty \sum_{n = 0}^\infty (2\ell+1) a_\ell b_n \int_{-1}^1 x^n P_\ell(x) \dd x.$$
+
+	The following theorem gives the solution of the integral:
+
+	\begin{theorem}
+		For integers $n,\ell$ and $x \in [-1, 1]$,
+		\begin{equation*}
+			\int_{-1}^1 x^n P_\ell(x) \dd x =
+			\begin{cases}
+				2 \frac{n!}{(n - \ell)!! (n + \ell + 1)!!} & \text{even } n - \ell \ge 0 \\
+				0                                          & \text{otherwise }
+			\end{cases},
+		\end{equation*}
+		where $m!!$ denotes the double factorial for non-negative integer $m$, given by (\cite[8.33b]{arfkenMathematicalMethodsPhysicists2005})
+		\begin{equation*}
+			m!! = \begin{cases}
+				m \cdot (m-2) \cdot \ldots \cdot 3 \cdot 1 & \text{odd } m        \\
+				m \cdot (m-2) \cdot \ldots \cdot 4 \cdot 2 & \text{even } m \ne 0 \\
+				1                                          & m = 0
+			\end{cases}
+		\end{equation*}
+	\end{theorem}
+	\begin{proof}
+		We write the integral as $I = \int_{-1}^1 x^n P_\ell(x) \dd x$.
+		From \cite[Eqs. 8.922.1-2]{gradshteynTableIntegralsSeries2007}, we have the following Fourier-Legendre series for integer $m$:
+		\begin{align}
+			x^{2m}     & = \frac{1}{2m + 1} P_0(x) + \sum_{k=1}^{\infty}(4k + 1) \frac{2m (2m - 2) \ldots(2m - 2k + 2)}{(2m + 1)(2m + 3) \ldots (2m + 2k + 1)} P_{2k}(x)     \\
+			x^{2m + 1} & = \frac{3}{2m + 3} P_1(x) + \sum_{k=1}^{\infty}(4k + 3) \frac{2m (2m - 2) \ldots(2m - 2k + 2)}{(2m + 3)(2m + 5) \ldots (2m + 2k + 3)} P_{2k + 1}(x)
+		\end{align}
+		For even $n$, we set $n = 2m$ and use the orthogonality property of the Legendre polynomials in \cref{legendre_orthog},
+		\begin{equation*}
+			I = \begin{cases}
+				0                                                                             & \text{odd } \ell        \\
+				\frac{2}{n + 1}                                                               & \ell = 0                \\
+				\frac{2 n (n - 2) \ldots(n - \ell + 2)}{(n + 1)(n + 3) \ldots (n + \ell + 1)} & \text{even } \ell \ne 0
+			\end{cases}.
+		\end{equation*}
+		Note that because $n$ and $\ell$ are both even, the numerator is a product of even numbers.
+		If $\ell > n$, then 0 is always in this product, and the term is therefore zero.
+		We can unify the even $\ell$ case and $\ell=0$ case by writing the numerator and denominator with double factorials:
+		$$2 \frac{n!!}{(n-\ell)!!} \frac{(n - 1)!!}{(n + \ell + 1)!!}.$$
+
+		For odd $n$, we set $n = 2m+1$ and again use the orthogonality property to get
+		\begin{equation*}
+			I = \begin{cases}
+				0                                                                                  & \text{even } \ell      \\
+				\frac{2}{n + 3}                                                                    & \ell = 1               \\
+				\frac{2(n - 1) (n - 3) \ldots(n - \ell + 2)}{(n + 2)(n + 4) \ldots (n + \ell + 1)} & \text{odd } \ell \ne 1
+			\end{cases}.
+		\end{equation*}
+		Again, the numerator is a product of even numbers that includes 0 whenever $\ell > n$.
+		The odd $\ell$ and $\ell = 1$ cases can also be unified with the double factorial
+		$$2\frac{(n - 1)!!}{(n - \ell)!!} \frac{n!!}{(n + \ell + 1)!!}.$$
+
+		Therefore, both the even and odd $n$ cases yield the same result, but for even and odd $\ell$, respectively.
+		These two cases are unified when $n - \ell$ is even.
+		We can further simplify $I$ using the fact that $n! = n!! (n - 1)!!$:
+		\begin{equation*}
+			I = \begin{cases}
+				2 \frac{n!}{(n - \ell)!! (n + \ell + 1)!!} & \text{even } n - \ell \ge 0 \\
+				0                                          & \text{otherwise }
+			\end{cases}.
+		\end{equation*}
+	\end{proof}
+
+	Writing the sum in terms of $k = \frac{n - \ell}{2}$, using the property from \cite[Eq. 8.33c]{arfkenMathematicalMethodsPhysicists2005} that $(2k)!! = 2^k k!$, and enforcing $n \ge \ell$, the expectation is
+	$$\expect{f}{\pi} = \sum_{n = 0}^\infty \sum_{k = 0}^{\left\lfloor\frac{n}{2}\right\rfloor} (2(n - k) + 1 - 2k) a_{n - 2k} b_n \frac{n!}{2^k k! (2(n - k) + 1)!!}.$$
+
+	Using this formula, we can then write out in closed-form the four expectations of interest in terms of the Fourier-Legendre series coefficients $a_\ell$:
+	\begin{align*}
+		\expect{f_1}{\pi} & = \frac{3}{5} a_1 + \frac{2}{5} a_3                                            \\
+		\expect{f_2}{\pi} & = \frac{2}{5} a_1 - \frac{2}{5} a_3                                            \\
+		\expect{f_3}{\pi} & = \frac{2}{35} + \frac{2}{21} a_2 - \frac{32}{385} a_4 - \frac{16}{231} a_6    \\
+		\expect{f_4}{\pi} & = \frac{16}{35} - \frac{16}{21} a_2 + \frac{144}{385} a_4 - \frac{16}{231} a_6
+	\end{align*}
+	There are several direct consequences of these formulas.
+	First, if we can exactly compute the five coefficients $(a_1,a_2,a_3,a_4,a_6)$ for a given $\pi(\theta)$, then we are able to exactly compute the expectations with practically no additional cost.
+	Second, even in the limit of noise-free data and no deviation from the assumptions, it is not possible to uniquely determine these five coefficients from a set of SHG and TPF measurements, as we have two knowns and five unknowns.
+	Therefore, the problem is fundamentally underdetermined.
+	Third, while SHG and TPF inform the same underlying polar distribution, they inform orthogonal properties of the distribution.
+	While SHG informs low resolution (\ie smooth) properties of the distribution, TPF also informs several higher resolution properties.
+	Fourth, even if we could exactly determine these five coefficients, that would be insufficient to uniquely determine $\pi(\theta)$.
+	In fact, it would not even be sufficient to ensure the positivity condition $\pi(\theta) > 0$ for all $\theta$.
+	To ensure this condition, we would need all $a_\ell$ as $\ell \to \infty$;
+	however, it is not possible for SHG and TPF to inform $\ell > 6$.
+	Hence, to determine $\pi(\theta)$, we need to integrate SHG and TPF data with other data and prior information.
+
+	% \section{Polar density functions}
+
+	% There are two distinct approaches to determining $\pi(\theta)$ from SHG data alone or in combination with TPF data.
+	% The first and most commonly used is to assume a family of distributions for $\pi(\theta)$ and fit its parameters to satisfy the measurements under the assumption of no noise.
+
+	% \subsection{The modified wrapped normal distribution}
+
+	% The usually assumed family is a modified form of the wrapped normal distribution $\mathrm{WN}(\theta_0, \sigma)$, which when unmodified has a mode at $\theta_0$ and a "standard deviation" $\sigma$.
+	% $\mathrm{WN}$ arises from wrapping a normal distribution around the circle repeatedly.
+	% For this reason it is also the distribution that results from circular Brownian motion.
+	% It is sometimes used in directional statistics \supercite{mardiaDirectionalStatistics1999}.
+	% \cite{raoMolecularOrientationalDistribution2011} used $\mathrm{WN}$ directly with respect to the angular measure $\d\theta$.
+	% However, $\mathrm{WN}$ does not take into account that the dipole moment is a three-dimensional vector, that is, a point on a sphere.
+	% To account for this, \cite{simpsonSHGMagicAngle1999} complemented $\mathrm{WN}$ with the polar angular measure $\sin\theta d\theta$ and re-normalized the density function.
+	% % Because this distribution has two parameters, $\theta_0$ and $\sigma$, if a combination of these two parameters is able to reproduce the measured n
+
+	% While the choice of $\mathrm{WN}$ is intuitive because $\pi(\theta)$ is then proportional to a wrapped normal density function, this distribution has several shortcomings.
+	% First, it cannot represent a multimodal distribution.
+	% Second, it does not correspond to an actual spherical distribution.
+	% That is, it is unknown what spherical distribution of a dipole moment would produce such an angular distribution.
+	% However, $\mathrm{WN}$ is just the circular ($p=2$) version of the more general Brownian motion distribution $\mathrm{BM}_p$ on the $(p-1)$-sphere (\ie $\mathrm{WN} = \mathrm{BM}_2$)\supercite{mardiaDirectionalStatistics1999}.
+	% Thus the same arguments for using $\mathrm{WN}$ motivate using the $\mathrm{BM}_3$ distribution.
+
+	% \subsection{The Brownian motion distribution on the unit sphere}
+
+	% To our knowledge, the Brownian motion distribution on the unit sphere ($\mathrm{BM}_3$) has never been used to fit the polar density function using SHG data.
+	% \cite{perrinEtudeMathematiqueMouvement1928,yosidaBrownianMotionSurface1949} derived the form of $\mathrm{BM}_3$ in terms of spherical harmonics.
+	% If the mode of the distribution is at the unit vector $\mu$, with the spherical coordinates $(\theta_0, \phi_0)$, then the density of $\mathrm{BM}_3$ in spherical coordinates with respect to the measure $\sin\theta \dd\theta \dd\phi$ is
+	% \begin{align*}
+	% 	\pi_{\mathrm{\mathrm{BM}_3}}(x \mid \mu, \sigma)
+	% 	 & = \sum_{\ell=0}^\infty \sum_{m=-\ell}^\ell
+	% 	e^{-\frac{1}{2} \ell(\ell + 1) \sigma^2} \conj{Y_\ell^{m}(\mu)} Y_\ell^{m}(x) \\
+	% 	\pi_{\mathrm{\mathrm{BM}_3}}(\theta, \phi \mid \theta_0, \phi_0, \sigma)
+	% 	 & = \frac{1}{4\pi} \sum_{\ell=0}^\infty (2\ell + 1) \sum_{m=-\ell}^\ell
+	% 	e^{-\frac{1}{2} \ell(\ell + 1) \sigma^2} P_\ell^m(\cos\theta_0) P_\ell^m(\cos\theta) e^{\im m (\phi - \phi_0)},
+	% \end{align*}
+	% where $\sigma$ is a diffusion coefficient related to a standard deviation, and in the second equation we have used \cref{spher_harmon} to write the sum in term of associated Legendre polynomials.
+	% By integrating out $\phi$, we obtain the resulting polar density with respect to $\sin\theta \dd\theta$ as
+	% \begin{equation} \label{eq:bm3_legendre}
+	% 	\pi_{\mathrm{\mathrm{BM}_3}}(\theta \mid \theta_0, \sigma) = \frac{1}{2} \sum_{\ell=0}^\infty a_\ell P_\ell(\cos\theta), \quad
+	% 	a_\ell = (2\ell + 1) e^{-\frac{1}{2} \ell(\ell + 1) \sigma^2} P_\ell(\cos\theta_0).
+	% \end{equation}
+	% This is the Fourier-Legendre series of $\pi_{\mathrm{\mathrm{BM}_3}}$, with coefficients $a_\ell$.
+	% As a result, we can directly write the four expectations in these terms.
+	% For example, for SHG, we have the expectations and ratio
+	% \begin{align}
+	% 	\expect{f_1}{\mathrm{BM}_3}
+	% 	                 & = \frac{1}{5} e^{-\sigma^2} \cos\theta_0 \qty(
+	% 	3 + e^{-5\sigma^2} \qty(5 \cos^2\theta_0 - 3)
+	% 	) \nonumber                                                                                                                         \\
+	% 	\expect{f_2}{\mathrm{BM}_3}
+	% 	                 & = \frac{1}{5} e^{-\sigma^2} \cos\theta_0 \qty(
+	% 	2 - e^{-5\sigma^2} \qty(5 \cos^2\theta_0 - 3)
+	% 	)                                                                                                                                   \\
+	% 	R_{\mathrm{SHG}} & = 4 r_f^4 \qty(\frac{3 + e^{-5 \sigma^2} (5 \cos^2\theta_0 - 3)}{2 - e^{-5 \sigma^2} (5 \cos^2\theta_0 - 3)})^2.
+	% \end{align}
+
+	% These expressions are highly efficient to compute.
+	% Moreover, the equation for the SHG ratio reveals several asymptotic properties for the Dirac measure (delta function; $\sigma \to 0$) and uniform distribution ($\sigma \to \infty$) cases:
+	% \begin{align*}
+	% 	\lim_{\sigma \to 0} R_{\mathrm{SHG}}      & = 4 r_f^4 \cot^4 \theta_0 \\
+	% 	\lim_{\sigma \to \infty} R_{\mathrm{SHG}} & = 9 r_f^4.
+	% \end{align*}
+
+	% It is also efficient to draw samples from $\mathrm{BM}_3$.
+	% $\mathrm{BM}_3$ is thus for physical, computational, and statistical reasons a more appropriate family of distributions for representing the polar angle distribution than the more common modified wrapped normal distribution.
+	% However, if the true angular distribution is multimodal, $\mathrm{BM}_3$ also may not be able to reproduce the data.
+	% It is thus preferable to have a generic distributional family.
+
+	% \subsection{An integrative approach}
+
+	% For the purpose of ensemble modeling, we are not actually interested in the polar density function.
+	% In fact, we are interested in the structural ensemble, which includes the probe.
+	% In principle, the directional distribution of the probe informs all rotational degrees of freedom between the probe and the protein-surface attachment, including tilting of the protein on the surface, structural heterogeneity of the protein, and the interaction of the probe with the protein.
+	% However, even if we could exactly determine the polar density function, this is just a low resolution projection of the complicated underlying orientational ensemble onto a single axis (the polar angle).
+	% However, in a typical SHG/TPF set of experiments, measurements can be collected varying the site of the probe, the site of surface attachment, the molecular structure of the probe, any experimental conditions, and potentially the orientation of the molecule on the surface.
+	% In a high-throughput experiment, through permuting these various conditions, we obtain different projective views through the orientational degrees of freedom.
+	% By analogy to tomography, where many two-dimensional projective views are collected, enabling reconstruction of the underlying three-dimensional density, these many projective views could in principle be used to reconstruct low resolution density functions for various orientational degrees of freedom within the protein structure.
+
+	% \todo{introduce assumptions, \ie same assumptions of kinematic ensemble method}
+
+	% \todo{point out that given the polar density function in above, the kinematic ensemble approach already gives us everything we need}
+
+	% \todo{comment on how distance restraints can be combined with SHG/TPF to inform same degrees of freedom}
+
+	% \section{Implementation notes}
+
+	% \todo{We only need $p=0$, $s=0$ terms since there is no translational contributions, and $L=6$ is fixed so method is $\order{NM}$ for $M$ chains and $N$ nodes in longest chain.}
+
+	% \todo{note limiting case, if $\Sigma_{RR} = \sigma^2 I_3$, then Fourier transforms are scalar matrices and commute with $U$, causing all $U$'s to merge, and $\pi(\theta) \equiv \pi_{\mathrm{BM}_3}(\theta)$. Scoring function can be evaluated in microseconds.}
+
+	\clearpage
+	\printbibliography[heading=subbibintoc]
+\end{refsection}
+
+\end{document}

@@ -1,0 +1,52 @@
+\clearpage
+
+\begin{center}
+	\makeatletter
+	{\Large \textbf{\@title}}
+
+	\@author
+
+	\makeatother
+
+	\vspace{1cm}
+	\textbf{Abstract}
+\end{center}
+
+Biologically relevant molecules are often dynamic.
+That they are not rigid is frequently critical for their function but also makes them immensely challenging to study.
+Nevertheless, and perhaps surprisingly, across the fields of cheminformatics and computational biology, algorithms and analyses that ignore the flexibility of such molecules have been widely useful.
+To date, most solved protein structures approximate a protein as a single rigid structure, even when data used to determine the structure was clearly derived from many molecules.
+Likewise, connectivity or feature fingerprint representations of small molecules have been quite useful for training machine learning methods to predict properties such as whether a molecule might have a high binding affinity to a protein.
+Despite the many successes of these approximations, there are many cases where an explicit encoding of the structure and dynamics of a molecule either is required or is reasonably expected to improve the performance of some method.
+Such an encoding is called a representation.
+
+As input to a machine learning model for small molecule target prediction, the representation of the molecule encodes the molecule's structure into a format suitable as an input to the machine learning method.
+A well-performing representation in this category generally converts the molecule to an array of numbers, encoding as many unique features as possible.
+The representation need not be human-interpretable; therefore, it can be a highly compressed view of the input information.
+
+On the other hand, a useful representation for inferring a macromolecular structure has a different set of properties.
+Such a representation is a language that defines the world of possible hypothetical structures.
+In order to be useful, it must be interpretable; that is, it must be somehow relatable to the actual biological system of interest, and when fitting the structure with data, the representation of the molecule must be accompanied with some representation of the physical process that generated the data.
+However, it is easy to make the representation too expressive, making it infeasible to actually explore the representational space for fitting a structure.
+Therefore, the currently best available representation for determining a certain structure is usually a compromise based on the nature of the biological question of interest and availability of data and computational resources.
+As more detailed biological questions are posed, more information is acquired, and hardware and algorithms become more efficient, more elaborate structural models can be constructed.
+
+There is in general no optimal representation for a molecular structure.
+Rather, for each analysis, and even for each stage of an analysis, a different representation may be preferable.
+Ideally, the practitioner would have at their disposal a large library of molecular representations designed for different tasks, each with their benefits and limitations well-established.
+Furthermore, to be generally useful, these representations should be either easy to implement or have existing efficient, well-tested, stand-alone implementations that can then be integrated into an existing analysis workflow with little additional effort.
+This thesis presents two new representations for this library, each for a different class of problems.
+
+\cref{e3fp-paper} presents the Extended Three-Dimensional Fingerprint (E3FP), a simple approach for encoding three-dimensional structural features of small molecules that generalizes widely used methods that use only the molecule's connectivity.
+For a given molecule, E3FP generates a bitvector fingerprint that can then be used to train machine learning methods for various tasks.
+We showed that the representation in some cases outperformed widely used non-structural representations and even other three-dimensional representations for predicting target-molecule binding pairs.
+Moreover, this chapter explored several modifications to E3FP to represent sets of conformers for the same molecule (\ie a molecular ensemble) and showed that these techniques also performed well.
+
+\cref{ensemble-inference,shg-tpf} are adapted from in-preparation manuscripts and introduce a structural representation for Bayesian inference of structural ensembles.
+Most techniques for structural inference often either treat a structure as rigid or rely heavily on expensive molecular dynamics techniques to simulate multiple copies of a system, which are perturbed during sampling or post-processing to satisfy data restraints.
+This work takes a different approach, approximating the ensemble as a continuous distribution of structures from which measured data can be efficiently simulated through ensemble averaging.
+This is achieved by making a number of assumptions about how the structure can be separated into rigid bodies and how those bodies interact.
+Techniques from group theory and harmonic analysis on the kinematic groups enable efficient simulation of ensemble averaged data.
+The result is the kinematic ensemble representation.
+In \cref{ensemble-inference}, the kinematic ensemble representation is applied for ensemble inference using nuclear magnetic resonance (NMR) nuclear Overhauser effect (NOE) measurements, while \cref{shg-tpf} extends the technique for ensemble inference using second-harmonic generation (SHG) and two-photon fluorescence (TPF) measurements.
+To keep the main text accessible, the theory and derivations underpinning the kinematic ensemble representation are given in \cref{ensemble-inference-si,shg-tpf-si}, while \cref{ad-rules,ad-power-series} are stand-alone explanations of some of the automatic differentiation methods used in this work.

@@ -1,4 +1,6 @@
-\documentclass[12pt,twoside]{report}
+\documentclass[12pt,final]{report}
+\sloppy
+
 \usepackage[utf8]{inputenc}
 
 \title{Representing Ensembles of Molecules}
@@ -6,41 +8,91 @@
 \date{August 2020}
 
 \usepackage{graphicx}
-\graphicspath{ {figures/} }
+\usepackage{caption}
+\usepackage{subcaption}
+
+% allow creating starred versions of commands
+\usepackage{suffix}
 
 % UCSF style
 \usepackage[margin=1in]{geometry}
 \usepackage{setspace} % Allows double spacing with the \doublespacing command
 \usepackage{fancyhdr}
-% \setlength{\headheight}{14.5pt}
+\renewcommand{\subsectionmark}[1]{\markboth{#1}{}}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
 \fancyfoot[C]{\thepage}
 % not sure if this is necessary, but UCSF guidelines stress no widows or orphans
 \usepackage[defaultlines=1,all]{nowidow}
+\widowpenalty=100000
+\clubpenalty=100000
+
+% for adding title page and library release
+\usepackage{pdfpages}
+
+% use " as double quote
+\usepackage[autostyle, english=american]{csquotes}
+\MakeOuterQuote{"}
 
 % E3FP paper preamble
 \usepackage{siunitx}
 \usepackage{amssymb}
-\usepackage{textgreek}
+\usepackage{upgreek}
 \newcommand{\AUCsum}{AUC\textsubscript{SUM}}
 \newcommand{\LEunit}{kcal/mol/heavy atom}
-\newcommand{\axbx}[2]{\textalpha #1\textbeta #2}
-\newcommand{\ax}[1]{\textalpha #1}
+\newcommand{\axbx}[2]{\(\upalpha\)#1\(\upbeta\)#2}
+\newcommand{\ax}[1]{\(\upalpha\)#1}
 \newcommand{\Mx}[1]{M\textsubscript{#1}}
-\newcommand{\ICfifty}{$IC_\text{50}$}
-\newcommand{\Ki}{$K_i$}
+\newcommand{\ICfifty}{\(IC_\text{50}\)}
+\newcommand{\Ki}{\(K_i\)}
 \DeclareSIUnit{\molar}{M}
 \sisetup{per-mode=symbol, detect-weight=true, detect-family=true}
 
 % bibliography data
-\usepackage{biblatex}
+\usepackage[
+  backend=biber,
+  style=nature,
+  natbib=true,
+  sortlocale=en_US,
+  url=false, 
+  doi=true,
+  eprint=false,
+  backref=true,
+  maxbibnames=99,
+]{biblatex}
 \addbibresource{references.bib}
+\preto\fullcite{\AtNextCite{\defcounter{maxnames}{99}}}
 
 % table formatting
+\usepackage{tabularx}
 \usepackage{booktabs}
 
 % math
 \usepackage{amsmath}
-\raggedbottom
+\raggedbottom{}
+
+% really wide hat
+% https://tex.stackexchange.com/questions/100574/really-wide-hat-symbol/101136
+\usepackage{scalerel,stackengine}
+\stackMath
+\newcommand\reallywidehat[1]{%
+\savestack{\tmpbox}{\stretchto{%
+  \scaleto{%
+    \scalerel*[\widthof{\ensuremath{#1}}]{\kern.1pt\mathchar"0362\kern.1pt}%
+    {\rule{0ex}{\textheight}}%WIDTH-LIMITED CIRCUMFLEX
+  }{\textheight}% 
+}{2.4ex}}%
+\stackon[-6.9pt]{#1}{\tmpbox}%
+}
+\parskip 1ex
+
+% theorems
+\usepackage{amsthm}
+\usepackage{physics}
+\usepackage{thmtools}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
 
 %% symbols
 \newcommand{\torus}{\mathbb{T}}
@@ -48,6 +100,7 @@
 \newcommand{\manifold}[1]{\mset{#1}}
 \newcommand{\group}[1]{\mset{#1}}
 \newcommand{\liealg}[1]{\mathfrak{#1}}
+\newcommand{\dual}[1]{\hat{#1}}
 %%% basic types
 \renewcommand{\vec}[1]{\MakeLowercase{#1}}
 \newcommand{\mat}[1]{\MakeUppercase{#1}}
@@ -57,13 +110,18 @@
 \newcommand{\invtrans}[1]{{#1}^{-\mathrm{T}}}
 \newcommand{\hconj}[1]{{#1}^\mathrm{H}}
 \newcommand{\invhconj}[1]{{#1}^{-\mathrm{H}}}
-\newcommand{\tr}{\operatorname{tr}}
 \newcommand{\sign}{\operatorname{sign}}
 \newcommand{\diag}{\operatorname{diag}}
 \newcommand{\expm}{\operatorname{Exp}}
 \newcommand{\logm}{\operatorname{Log}}
 \newcommand{\convwith}{*}
-\newcommand{\coef}{\tilde}
+\newcommand{\expect}[2]{\left\langle #1 \right\rangle_{#2}}
+\newcommand{\coef}[1]{\hat{#1}}
+\newcommand\ftrans[1]{\mathcal{F}\qty[#1]}
+\WithSuffix\newcommand\ftrans*[1]{\mathcal{F}[#1]}
+\newcommand\finvtrans[1]{\mathcal{F}^{-1}\qty[#1]}
+\WithSuffix\newcommand\finvtrans*[1]{\mathcal{F}^{-1}[#1]}
+\newcommand{\finversion}[1]{{#1}^{\dagger}}
 \newcommand{\inner}[2]{\left\langle #1, #2 \right\rangle}
 %%% differential types
 \newcommand{\Dtan}[1]{\dot{#1}} % tangent
@@ -71,111 +129,154 @@
 %%% shorthand for specific objects
 \newcommand{\bbR}{\mathbb{R}}
 \newcommand{\bbC}{\mathbb{C}}
-\newcommand{\SE}[1]{\group{SE}(#1)}
-\newcommand{\se}[1]{\liealg{se}(#1)}
-\newcommand{\SO}[1]{\group{SO}(#1)}
-\newcommand{\so}[1]{\liealg{so}(#1)}
-\newcommand{\Transg}[1]{\group{T}(#1)}
-\newcommand{\transg}[1]{\liealg{t}(#1)}
-\newcommand{\SU}[1]{\group{SU}(#1)}
-\newcommand{\su}[1]{\liealg{su}(#1)}
-\newcommand{\GL}[1]{\group{GL}(#1)}
-\newcommand{\gl}[1]{\liealg{gl}(#1)}
-\newcommand{\GA}[1]{\group{GA}(#1)}
-\newcommand{\ga}[1]{\liealg{ga}(#1)}
+\newcommand{\SE}[1]{\group{SE} (#1)}
+\newcommand{\se}[1]{\liealg{se} (#1)}
+\newcommand{\SO}[1]{\group{SO} (#1)}
+\newcommand{\so}[1]{\liealg{so} (#1)}
+\newcommand{\Transg}[1]{\group{T} (#1)}
+\newcommand{\transg}[1]{\liealg{t} (#1)}
+\newcommand{\SU}[1]{\group{SU} (#1)}
+\newcommand{\su}[1]{\liealg{su} (#1)}
+\newcommand{\GL}[1]{\group{GL} (#1)}
+\newcommand{\gl}[1]{\liealg{gl} (#1)}
+\newcommand{\GA}[1]{\group{GA} (#1)}
+\newcommand{\ga}[1]{\liealg{ga} (#1)}
 \newcommand{\im}{i}
+\newcommand{\bodyframe}[1]{\mathcal{#1}}
+\newcommand{\diffnorm}{\operatorname{DiffNormal}}
+\newcommand{\ie}{\emph{i.e.},~}
+\newcommand{\eg}{\emph{e.g.},~}
 
 % code formatting
 \usepackage{sourcecodepro} % support more UTF-8 characters
 \usepackage{minted} % syntax highlighting
 \newminted{julia}{frame=lines,framesep=2mm}
 
+% PGFPlotsX.jl preamble built by Plots.jl
+\usepackage{pgfplots}
+\pgfplotsset{compat=newest}
+\usepgfplotslibrary{groupplots}
+\usepgfplotslibrary{polar}
+\usepgfplotslibrary{smithchart}
+\usepgfplotslibrary{statistics}
+\usepgfplotslibrary{dateplot}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{backgrounds}
+\usepgfplotslibrary{patchplots}
+\usepgfplotslibrary{fillbetween}
+\pgfplotsset{%
+layers/standard/.define layer set={%
+    background,axis background,axis grid,axis ticks,axis lines,axis tick labels,pre main,main,axis descriptions,axis foreground%
+}{grid style= {/pgfplots/on layer=axis grid},%
+    tick style= {/pgfplots/on layer=axis ticks},%
+    axis line style= {/pgfplots/on layer=axis lines},%
+    label style= {/pgfplots/on layer=axis descriptions},%
+    legend style= {/pgfplots/on layer=axis descriptions},%
+    title style= {/pgfplots/on layer=axis descriptions},%
+    colorbar style= {/pgfplots/on layer=axis descriptions},%
+    ticklabel style= {/pgfplots/on layer=axis tick labels},%
+    axis background@ style={/pgfplots/on layer=axis background},%
+    3d box foreground style={/pgfplots/on layer=axis foreground},%
+    },
+}
+\usepackage{tikzscale}
+% cache generated pdf files for faster compilation of LaTeX documents
+\usepgfplotslibrary{external}
+\tikzexternalize
+
 % reference formatting
 \usepackage{hyperref}
 \usepackage{nameref}
 \usepackage{chngcntr}
+\usepackage{doi}
 \counterwithin{figure}{chapter}
 \counterwithin{table}{chapter}
 \counterwithin{equation}{chapter}
 \usepackage[capitalize, nameinlink]{cleveref}
-\crefdefaultlabelformat{#2\textbf{#1}#3} % <-- Only #1 in \textbf
+\crefdefaultlabelformat{#2#1#3}
+\creflabelformat{figure}{#2\textbf{#1}#3}
 \crefname{figure}{\textbf{Fig.}}{\textbf{Figs.}}
 \Crefname{figure}{\textbf{Fig.}}{\textbf{Figs.}}
+\creflabelformat{table}{#2\textbf{#1}#3}
 \crefname{table}{\textbf{Table}}{\textbf{Tables}}
 \Crefname{table}{\textbf{Table}}{\textbf{Tables}}
-\crefname{equation}{\textbf{Eq.}}{\textbf{Eqs.}}
-\Crefname{equation}{\textbf{Eq.}}{\textbf{Eqs.}}
+\crefname{equation}{Eq.}{Eqs.}
+\Crefname{equation}{Eq.}{Eqs.}
+\crefname{theorem}{Theorem}{Theorems}
+\Crefname{theorem}{Theorem}{Theorems}
+\crefname{corollary}{Corollary}{Corollaries}
+\Crefname{corollary}{Corollary}{Corollaries}
+\crefname{lemma}{Lemma}{Lemmas}
+\Crefname{lemma}{Lemma}{Lemmas}
 
-\usepackage[colorinlistoftodos]{todonotes} % for todo entries
+% \usepackage[acronym,xindy]{glossaries}
+% \makeglossaries
+% \loadglsentries{glossary}
 
-\usepackage{subfiles} % compile files separately
+% commas between consecutive footnote superscripts
+\usepackage{fnpct}
+
+% for todo entries
+\usepackage[colorinlistoftodos]{todonotes}
+\makeatletter % single spacing in to-do notes
+\renewcommand{\todo}[2][]{%
+    \tikzexternaldisable % don't hide with tikzexternalize
+    \@todo[caption={#2}, #1,inline]{\begin{spacing}{0.75}#2\end{spacing}}%
+    \tikzexternalenable
+} 
+\makeatother
+\newcommand{\insertref}[1]{\todo[color=green!40]{#1}}
+
+% for line numbers
+% \usepackage{lineno}
+% \linenumbers
+
+\usepackage{subfiles} % enable per-chapter compilation
 
 \begin{document}
+
+% FRONTMATTER
 
 \pagestyle{plain} % no headers
 
 % UCSF as of Summer 2020 does not include the title page
-% \maketitle
 \pagenumbering{roman}
-\setcounter{page}{2}
 
+\includepdf[pages=-,width=\paperwidth]{frontmatter/titlepage.pdf}
 \input{frontmatter/copyright}
-
-\doublespacing
-
-\chapter*{Acknowledgements}
+\doublespacing{}
 \input{frontmatter/acknowledgments}
-
-\chapter*{Contributions}
 \input{frontmatter/contributions}
-
-\chapter*{Epigraph}
-\input{frontmatter/epigraph}
-
-\chapter*{Abstract}
+% \input{frontmatter/epigraph}
 \input{frontmatter/abstract}
-
 \tableofcontents
-
 \listoffigures
-
 \listoftables
+
+% CHAPTERS
 
 \clearpage
 \pagestyle{fancy} % header
 \pagenumbering{arabic}
 \setcounter{page}{1}
 
-\chapter{Introduction}
-\subfile{chapters/introduction}
+\subfile{chapters/chapter01/chapter01}
+\subfile{chapters/chapter02/chapter02}
+\addtocontents{toc}{\protect\newpage} % avoid dangling at end of page
+\subfile{chapters/chapter03/chapter03}
 
-\chapter{A simple representation of three-dimensional molecular structure}
-\label{e3fp-paper}
-\chaptermark{Three-dimensional molecular representation}
-\subfile{chapters/chapter02}
-
-\chapter{Inferring ensembles of macromolecular structures}
-\label{ensemble-inference}
-\chaptermark{Inferring macromolecular ensembles}
-\subfile{chapters/chapter03}
-
-\chapter{SHG/TPF}
-\label{shg-tpf}
-\subfile{chapters/chapter04}
+% APPENDIX
 
 \appendix
+\subfile{chapters/appendixa/appendixa}
+\subfile{chapters/appendixb/appendixb}
+\subfile{chapters/appendixc/appendixc}
+\subfile{chapters/appendixd/appendixd}
 
-\chapter{Supplementary information for Chapter \ref{ensemble-inference}}
-\subfile{chapters/appendixa}
+% \printglossary[title=List of Terms]
 
-\chapter{Supplementary information for Chapter \ref{shg-tpf}}
-\subfile{chapters/appendixb}
+% \listoftodos
 
-\chapter{Deriving automatic differentiation rules}
-\subfile{chapters/appendixc}
-
-\chapter{Automatic differentation rules for power series functions of diagonalizable matrices}
-\chaptermark {Differentating power series functions}
-\subfile{chapters/appendixd}
+\includepdf[pages=-,width=\paperwidth]{backmatter/publishing_agreement.pdf}
 
 \end{document}

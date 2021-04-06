@@ -1,0 +1,53 @@
+# LaTeX temporary files
+*.aux
+*.bcf
+*.glo
+*.idx
+*.log
+*.toc
+*.ist
+*.acn
+*.acr
+*.alg
+*.bbl
+*.blg
+*.dvi
+*.glg
+*.gls
+*.ilg
+*.ind
+*.fls
+*.lof
+*.lot
+*.maf
+*.mtc
+*.mtc1
+*.out
+*.run.xml
+*.xdv
+*.synctex*
+
+# Latexmk
+*.fdb_latexmk
+
+# PDF output - usually a bad idea to keep this in Git
+*.pdf
+!chapters/appendixa/Bmat*.pdf
+!chapters/appendixa/charfun*.pdf
+!frontmatter/*.pdf
+!backmatter/*.pdf
+
+# minted output
+_minted-*
+*.pyg
+
+# tikzexternalize
+*.md5
+*.auxlock
+*.dpth
+
+# todonotes
+*.tdo
+
+# glossary sort files
+*.xdy
